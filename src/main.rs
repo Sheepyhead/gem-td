@@ -27,7 +27,7 @@ pub const RESOLUTION: f32 = 16.0 / 9.0;
 fn main() {
     App::new()
         .insert_resource(AmbientLight {
-            brightness: 10.0,
+            brightness: 1.0,
             color: Color::WHITE,
         })
         .insert_resource(ClearColor(CLEAR))
@@ -44,6 +44,7 @@ fn main() {
         .add_plugin(Debug)
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_ground)
+        .add_startup_system(spawn_dirt)
         .run();
 }
 
@@ -59,6 +60,13 @@ fn spawn_camera(mut commands: Commands) {
 fn spawn_ground(mut commands: Commands, ass: Res<AssetServer>) {
     commands.spawn_bundle(SceneBundle {
         scene: ass.load("ground.glb#Scene0"),
+        ..default()
+    });
+}
+
+fn spawn_dirt(mut commands: Commands, ass: Res<AssetServer>) {
+    commands.spawn_bundle(SceneBundle {
+        scene: ass.load("dirtpile2.glb#Scene0"),
         ..default()
     });
 }
