@@ -14,8 +14,9 @@
     clippy::must_use_candidate,
     clippy::enum_glob_use
 )]
+#![feature(is_some_and)]
 
-use bevy::{prelude::*, render::camera::Projection};
+use bevy::{ecs::query::QuerySingleError, prelude::*, render::camera::Projection, utils::HashMap};
 use bevy_rapier3d::prelude::*;
 use common::approx_equal;
 use debug::Debug;
@@ -26,7 +27,7 @@ mod debug;
 pub const CLEAR: Color = Color::BLACK;
 pub const HEIGHT: f32 = 600.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
-pub const CAMERA_OFFSET: [f32; 3] = [10.0, 12.0, 10.0];
+pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
 
 fn main() {
     App::new()
@@ -48,9 +49,11 @@ fn main() {
         .add_plugin(RapierDebugRenderPlugin::default())
         // Internal plugins
         .add_plugin(Debug)
+        .insert_resource(BuildGrid::default())
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_ground)
         .add_startup_system(spawn_dirt)
+        .add_system(update_selection_tile_color)
         .add_system(update_under_cursor)
         .add_system(move_selected)
         .run();
@@ -74,17 +77,8 @@ fn spawn_ground(mut commands: Commands, ass: Res<AssetServer>) {
         .insert_bundle((Collider::cuboid(100.0, 0.01, 100.0),));
 }
 
-fn spawn_dirt(mut commands: Commands, ass: Res<AssetServer>) {
-    commands
-        .spawn_bundle(SceneBundle {
-            scene: ass.load("dirtpile1.glb#Scene0"),
-            ..default()
-        })
-        .insert_bundle((Name::new("Dirt Pile"), Selected));
-}
-
 #[derive(Component)]
-struct Selected;
+struct Selection;
 
 fn update_under_cursor(
     mut commands: Commands,
@@ -160,19 +154,177 @@ pub fn ray_from_screenspace(
     (cursor_pos_near, ray_direction * length)
 }
 
+fn spawn_dirt(mut commands: Commands, ass: Res<AssetServer>) {
+    commands
+        .spawn_bundle(SceneBundle {
+            scene: ass.load("dirtpile1.glb#Scene0"),
+            ..default()
+        })
+        .insert_bundle((Name::new("Dirt Pile"),));
+}
+
 fn move_selected(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     cursor: Option<Res<UnderCursor>>,
-    mut selected: Query<&mut Transform, With<Selected>>,
+    mut selected: Query<&mut Transform, With<Selection>>,
 ) {
-    let cursor = match cursor {
-        Some(cursor) => cursor,
-        None => return,
+    match selected.get_single_mut() {
+        Ok(mut selection) => {
+            let cursor = match cursor {
+                Some(cursor) => cursor,
+                None => return,
+            };
+            selection.translation = [
+                cursor.intersection.x.round(),
+                selection.translation.y,
+                cursor.intersection.z.round(),
+            ]
+            .into();
+        }
+        Err(QuerySingleError::NoEntities(..)) => {
+            let cursor = match cursor {
+                Some(cursor) => cursor,
+                None => return,
+            };
+            commands
+                .spawn_bundle(SpatialBundle {
+                    transform: Transform::from_xyz(
+                        cursor.intersection.x.round(),
+                        0.1,
+                        cursor.intersection.z.round(),
+                    ),
+                    ..default()
+                })
+                .insert(Selection)
+                .with_children(|parent| {
+                    let material = materials.add(Color::GREEN.into());
+                    let mesh = meshes.add(shape::Plane { size: 1.0 }.into());
+                    parent
+                        .spawn_bundle(PbrBundle {
+                            transform: Transform::from_translation((Vec3::X + Vec3::Z) / 2.0),
+                            mesh: mesh.clone(),
+                            material: material.clone(),
+                            ..default()
+                        })
+                        .insert(SelectionTile);
+                    parent
+                        .spawn_bundle(PbrBundle {
+                            transform: Transform::from_translation((Vec3::X + Vec3::NEG_Z) / 2.0),
+                            mesh: mesh.clone(),
+                            material: material.clone(),
+                            ..default()
+                        })
+                        .insert(SelectionTile);
+                    parent
+                        .spawn_bundle(PbrBundle {
+                            transform: Transform::from_translation((Vec3::NEG_X + Vec3::Z) / 2.0),
+                            mesh: mesh.clone(),
+                            material: material.clone(),
+                            ..default()
+                        })
+                        .insert(SelectionTile);
+                    parent
+                        .spawn_bundle(PbrBundle {
+                            transform: Transform::from_translation(
+                                (Vec3::NEG_X + Vec3::NEG_Z) / 2.0,
+                            ),
+                            mesh: mesh.clone(),
+                            material: material.clone(),
+                            ..default()
+                        })
+                        .insert(SelectionTile);
+                });
+        }
+        _ => panic!(),
     };
-    let mut selected = selected.single_mut();
-    selected.translation = [
-        cursor.intersection.x.round(),
-        selected.translation.y,
-        cursor.intersection.z.round(),
-    ]
-    .into();
+}
+
+#[derive(Component)]
+struct SelectionTile;
+
+fn update_selection_tile_color(
+    grid: Res<BuildGrid>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut tiles: Query<
+        (&GlobalTransform, &mut Handle<StandardMaterial>),
+        (With<SelectionTile>, Changed<GlobalTransform>),
+    >,
+) {
+    for (transform, mut material) in tiles.iter_mut() {
+        *material = get_selection_tile_color(
+            &grid,
+            &transform,
+            &materials.add(Color::GREEN.into()),
+            &materials.add(Color::RED.into()),
+        )
+    }
+}
+
+fn get_selection_tile_color(
+    grid: &BuildGrid,
+    pos: &GlobalTransform,
+    green: &Handle<StandardMaterial>,
+    red: &Handle<StandardMaterial>,
+) -> Handle<StandardMaterial> {
+    if grid.contains(
+        &(
+            (pos.translation().x + 0.5).round() as i32,
+            (pos.translation().z + 0.5).round() as i32,
+        )
+            .into(),
+    ) {
+        red
+    } else {
+        green
+    }
+    .clone()
+}
+
+#[derive(Default)]
+struct BuildGrid(HashMap<IVec2, Entity>);
+
+impl BuildGrid {
+    fn insert(&mut self, pos: IVec2, content: Entity) {
+        let positions = [pos, pos + IVec2::X, pos + IVec2::Y, pos + IVec2::ONE];
+        if positions.iter().all(|pos| !self.contains(pos)) {
+            for pos in positions {
+                self.0.insert(pos, content);
+            }
+        }
+    }
+
+    fn contains(&self, pos: &IVec2) -> bool {
+        self.0.contains_key(pos)
+    }
+
+    fn get(&self, pos: &IVec2) -> Option<Entity> {
+        self.0.get(pos).copied()
+    }
+
+    fn remove(&mut self, pos: &IVec2) {
+        if let Some(entity) = self.get(pos) {
+            let possible_positions = [
+                *pos + IVec2::NEG_X,
+                *pos + IVec2::NEG_Y,
+                *pos + IVec2::NEG_ONE,
+                *pos + IVec2::X,
+                *pos + IVec2::Y,
+                *pos + IVec2::ONE,
+                *pos + IVec2::NEG_X + IVec2::Y,
+                *pos + IVec2::X + IVec2::NEG_Y,
+            ];
+            possible_positions
+                .iter()
+                .filter(|pos| {
+                    self.get(*pos)
+                        .is_some_and(|pos_entity| pos_entity == entity)
+                })
+                .copied()
+                .collect::<Vec<_>>()
+                .iter()
+                .for_each(|pos| self.remove(pos));
+        }
+    }
 }
