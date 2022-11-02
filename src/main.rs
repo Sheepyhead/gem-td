@@ -20,6 +20,7 @@ use bevy::{ecs::query::QuerySingleError, prelude::*, render::camera::Projection,
 use bevy_rapier3d::prelude::*;
 use common::approx_equal;
 use debug::Debug;
+use iyes_loopless::prelude::*;
 
 mod common;
 mod debug;
@@ -48,14 +49,25 @@ fn main() {
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
         // Internal plugins
+        .add_loopless_state(GameState::InGame)
         .add_plugin(Debug)
         .insert_resource(BuildGrid::default())
-        .add_startup_system(spawn_camera)
-        .add_startup_system(spawn_ground)
-        .add_startup_system(spawn_dirt)
-        .add_system(update_selection_tile_color)
-        .add_system(update_under_cursor)
-        .add_system(move_selected)
+        .add_enter_system_set(
+            GameState::InGame,
+            ConditionSet::new()
+                .with_system(spawn_camera)
+                .with_system(spawn_ground)
+                .with_system(spawn_dirt)
+                .into(),
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(GameState::InGame)
+                .with_system(update_selection_tile_color)
+                .with_system(update_under_cursor)
+                .with_system(move_selected)
+                .into(),
+        )
         .run();
 }
 
@@ -252,7 +264,7 @@ fn update_selection_tile_color(
         (With<SelectionTile>, Changed<GlobalTransform>),
     >,
 ) {
-    for (transform, mut material) in tiles.iter_mut() {
+    for (transform, mut material) in &mut tiles {
         *material = get_selection_tile_color(
             &grid,
             &transform,
@@ -327,4 +339,10 @@ impl BuildGrid {
                 .for_each(|pos| self.remove(pos));
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum GameState {
+    StartMenu,
+    InGame,
 }
