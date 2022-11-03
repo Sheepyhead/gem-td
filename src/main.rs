@@ -21,10 +21,13 @@ use bevy_rapier3d::prelude::*;
 use common::approx_equal;
 use debug::Debug;
 use iyes_loopless::prelude::*;
+use model_animated::ModelKind;
+use movement::{MovePlugin, PathToFollow, Speed};
 
-mod animations;
 mod common;
 mod debug;
+mod model_animated;
+mod movement;
 
 pub const CLEAR: Color = Color::BLACK;
 pub const HEIGHT: f32 = 600.0;
@@ -52,15 +55,16 @@ fn main() {
         // Internal plugins
         .add_loopless_state(GameState::InGame)
         .add_plugin(Debug)
-        .add_plugin(animations::UnitsPlugin)
-        /*
-                .insert_resource(BuildGrid::default())
+        .add_plugin(model_animated::UnitsPlugin)
+        .add_plugin(MovePlugin)
+        .insert_resource(BuildGrid::default())
         .add_enter_system_set(
             GameState::InGame,
             ConditionSet::new()
                 .with_system(spawn_camera)
                 .with_system(spawn_ground)
                 .with_system(spawn_dirt)
+                .with_system(spawn_model)
                 .into(),
         )
         .add_system_set(
@@ -70,8 +74,21 @@ fn main() {
                 .with_system(update_under_cursor)
                 .with_system(move_selected)
                 .into(),
-        )*/
+        )
         .run();
+}
+
+fn spawn_model(mut commands: Commands) {
+    commands
+        .spawn_bundle(SceneBundle {
+            scene: ModelKind::Mouse.scene_handle(),
+            ..default()
+        })
+        .insert(ModelKind::Mouse)
+        .insert(Speed(2f32))
+        .insert(PathToFollow(
+            vec![Vec2::new(0f32, 5f32), Vec2::new(0f32, 0f32)].repeat(10),
+        ));
 }
 
 fn spawn_camera(mut commands: Commands) {
