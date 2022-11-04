@@ -22,6 +22,7 @@ use common::approx_equal;
 use debug::Debug;
 use iyes_loopless::prelude::*;
 
+mod animations;
 mod common;
 mod debug;
 
@@ -51,7 +52,9 @@ fn main() {
         // Internal plugins
         .add_loopless_state(GameState::InGame)
         .add_plugin(Debug)
-        .insert_resource(BuildGrid::default())
+        .add_plugin(animations::UnitsPlugin)
+        /*
+                .insert_resource(BuildGrid::default())
         .add_enter_system_set(
             GameState::InGame,
             ConditionSet::new()
@@ -67,7 +70,7 @@ fn main() {
                 .with_system(update_under_cursor)
                 .with_system(move_selected)
                 .into(),
-        )
+        )*/
         .run();
 }
 
