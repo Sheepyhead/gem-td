@@ -37,15 +37,17 @@ fn main() {
             color: Color::WHITE,
         })
         .insert_resource(ClearColor(CLEAR))
-        .insert_resource(WindowDescriptor {
-            width: HEIGHT * RESOLUTION,
-            height: HEIGHT,
-            title: "Bevy Template".to_string(),
-            resizable: false,
-            ..Default::default()
-        })
         // External plugins
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor {
+                width: HEIGHT * RESOLUTION,
+                height: HEIGHT,
+                title: "Bevy Template".to_string(),
+                resizable: false,
+                ..default()
+            },
+            ..default()
+        }))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
         // Internal plugins
@@ -77,16 +79,17 @@ fn spawn_camera(mut commands: Commands) {
     camera.transform.translation = CAMERA_OFFSET.into();
     camera.transform.look_at(Vec3::ZERO, Vec3::Y);
 
-    commands.spawn_bundle(camera);
+    commands.spawn(camera);
 }
 
 fn spawn_ground(mut commands: Commands, ass: Res<AssetServer>) {
-    commands
-        .spawn_bundle(SceneBundle {
+    commands.spawn((
+        SceneBundle {
             scene: ass.load("ground.glb#Scene0"),
             ..default()
-        })
-        .insert_bundle((Collider::cuboid(100.0, 0.01, 100.0),));
+        },
+        Collider::cuboid(100.0, 0.01, 100.0),
+    ));
 }
 
 #[derive(Component)]
@@ -128,6 +131,7 @@ fn update_under_cursor(
     }
 }
 
+#[derive(Resource)]
 struct UnderCursor {
     _target: Entity,
     intersection: Vec3,
@@ -168,11 +172,11 @@ pub fn ray_from_screenspace(
 
 fn spawn_dirt(mut commands: Commands, ass: Res<AssetServer>) {
     commands
-        .spawn_bundle(SceneBundle {
+        .spawn(SceneBundle {
             scene: ass.load("dirtpile1.glb#Scene0"),
             ..default()
         })
-        .insert_bundle((Name::new("Dirt Pile"),));
+        .insert(Name::new("Dirt Pile"));
 }
 
 fn move_selected(
@@ -201,7 +205,7 @@ fn move_selected(
                 None => return,
             };
             commands
-                .spawn_bundle(SpatialBundle {
+                .spawn(SpatialBundle {
                     transform: Transform::from_xyz(
                         cursor.intersection.x.round(),
                         0.1,
@@ -214,7 +218,7 @@ fn move_selected(
                     let material = materials.add(Color::GREEN.into());
                     let mesh = meshes.add(shape::Plane { size: 1.0 }.into());
                     parent
-                        .spawn_bundle(PbrBundle {
+                        .spawn(PbrBundle {
                             transform: Transform::from_translation((Vec3::X + Vec3::Z) / 2.0),
                             mesh: mesh.clone(),
                             material: material.clone(),
@@ -222,7 +226,7 @@ fn move_selected(
                         })
                         .insert(SelectionTile);
                     parent
-                        .spawn_bundle(PbrBundle {
+                        .spawn(PbrBundle {
                             transform: Transform::from_translation((Vec3::X + Vec3::NEG_Z) / 2.0),
                             mesh: mesh.clone(),
                             material: material.clone(),
@@ -230,7 +234,7 @@ fn move_selected(
                         })
                         .insert(SelectionTile);
                     parent
-                        .spawn_bundle(PbrBundle {
+                        .spawn(PbrBundle {
                             transform: Transform::from_translation((Vec3::NEG_X + Vec3::Z) / 2.0),
                             mesh: mesh.clone(),
                             material: material.clone(),
@@ -238,7 +242,7 @@ fn move_selected(
                         })
                         .insert(SelectionTile);
                     parent
-                        .spawn_bundle(PbrBundle {
+                        .spawn(PbrBundle {
                             transform: Transform::from_translation(
                                 (Vec3::NEG_X + Vec3::NEG_Z) / 2.0,
                             ),
@@ -294,7 +298,7 @@ fn get_selection_tile_color(
     .clone()
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct BuildGrid(HashMap<IVec2, Entity>);
 
 impl BuildGrid {
