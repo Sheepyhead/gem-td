@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.9"
-bevy-inspector-egui = "0.14"
-bevy_rapier3d = "0.19"
-bevy_egui = "0.17"
+bevy-inspector-egui = "0.17"
+bevy_rapier3d = "0.20"
+bevy_egui = "0.19"
 iyes_loopless = "0.9"
 
 [profile.dev]

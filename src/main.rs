@@ -17,13 +17,12 @@
 #![feature(is_some_and)]
 
 use bevy::{ecs::query::QuerySingleError, prelude::*, render::camera::Projection, utils::HashMap};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use common::approx_equal;
-use debug::Debug;
 use iyes_loopless::prelude::*;
 
 mod common;
-mod debug;
 
 pub const CLEAR: Color = Color::BLACK;
 pub const HEIGHT: f32 = 600.0;
@@ -50,9 +49,9 @@ fn main() {
         }))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(WorldInspectorPlugin)
         // Internal plugins
         .add_loopless_state(GameState::InGame)
-        .add_plugin(Debug)
         .insert_resource(BuildGrid::default())
         .add_enter_system_set(
             GameState::InGame,
@@ -121,7 +120,7 @@ fn update_under_cursor(
             to,
             Real::MAX,
             false,
-            QueryFilter::default().groups(InteractionGroups::all()),
+            QueryFilter::default(),
         ) {
             commands.insert_resource(UnderCursor {
                 _target: hit,
