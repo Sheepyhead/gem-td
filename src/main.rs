@@ -24,6 +24,7 @@ use iyes_loopless::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 mod common;
+mod input;
 
 pub const CLEAR: Color = Color::BLACK;
 pub const HEIGHT: f32 = 300.0;
@@ -44,21 +45,21 @@ fn main() {
                 height: HEIGHT,
                 title: "Bevy Template".to_string(),
                 resizable: false,
+                mode: WindowMode::BorderlessFullscreen,
                 ..default()
             },
             ..default()
         }))
-        .add_plugin(InputManagerPlugin::<PlayerActions>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(WorldInspectorPlugin)
         // Internal plugins
         .add_loopless_state(GameState::InGame)
+        .add_plugin(input::Input)
         .insert_resource(BuildGrid::default())
         .add_enter_system_set(
             GameState::InGame,
             ConditionSet::new()
-                .with_system(setup_player_input)
                 .with_system(spawn_camera)
                 .with_system(spawn_ground)
                 .into(),
@@ -69,7 +70,6 @@ fn main() {
                 .with_system(update_selection_tile_color)
                 .with_system(update_under_cursor)
                 .with_system(move_selected)
-                .with_system(build_at_cursor)
                 .into(),
         )
         .run();
@@ -340,43 +340,7 @@ enum GameState {
     InGame,
 }
 
-#[derive(Actionlike, Clone)]
-enum PlayerActions {
-    BuildAtCursor,
-}
-
 #[derive(Component)]
 struct Player {
     number: u32,
-}
-
-fn setup_player_input(mut commands: Commands) {
-    commands.spawn((
-        Player { number: 0 },
-        InputManagerBundle::<PlayerActions> {
-            input_map: InputMap::new([(KeyCode::B, PlayerActions::BuildAtCursor)]),
-            ..default()
-        },
-    ));
-}
-
-fn build_at_cursor(
-    mut commands: Commands,
-    ass: Res<AssetServer>,
-    cursor: Option<Res<UnderCursor>>,
-    action_states: Query<&ActionState<PlayerActions>, With<Player>>,
-) {
-    for state in action_states.iter() {
-        if state.just_pressed(PlayerActions::BuildAtCursor) {
-            if let Some(ref cursor) = cursor {
-                commands
-                    .spawn(SceneBundle {
-                        scene: ass.load("dirtpile1.glb#Scene0"),
-                        transform: Transform::from_translation(cursor.intersection),
-                        ..default()
-                    })
-                    .insert(Name::new("Dirt Pile"));
-            }
-        }
-    }
 }
