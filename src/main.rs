@@ -61,7 +61,6 @@ fn main() {
                 .with_system(setup_player_input)
                 .with_system(spawn_camera)
                 .with_system(spawn_ground)
-                .with_system(spawn_dirt)
                 .into(),
         )
         .add_system_set(
@@ -167,15 +166,6 @@ pub fn ray_from_screenspace(
     };
 
     (cursor_pos_near, ray_direction * length)
-}
-
-fn spawn_dirt(mut commands: Commands, ass: Res<AssetServer>) {
-    commands
-        .spawn(SceneBundle {
-            scene: ass.load("dirtpile1.glb#Scene0"),
-            ..default()
-        })
-        .insert(Name::new("Dirt Pile"));
 }
 
 fn move_selected(
@@ -370,10 +360,23 @@ fn setup_player_input(mut commands: Commands) {
     ));
 }
 
-fn build_at_cursor(action_states: Query<&ActionState<PlayerActions>, With<Player>>) {
+fn build_at_cursor(
+    mut commands: Commands,
+    ass: Res<AssetServer>,
+    cursor: Option<Res<UnderCursor>>,
+    action_states: Query<&ActionState<PlayerActions>, With<Player>>,
+) {
     for state in action_states.iter() {
         if state.just_pressed(PlayerActions::BuildAtCursor) {
-            println!("Action!");
+            if let Some(ref cursor) = cursor {
+                commands
+                    .spawn(SceneBundle {
+                        scene: ass.load("dirtpile1.glb#Scene0"),
+                        transform: Transform::from_translation(cursor.intersection),
+                        ..default()
+                    })
+                    .insert(Name::new("Dirt Pile"));
+            }
         }
     }
 }
