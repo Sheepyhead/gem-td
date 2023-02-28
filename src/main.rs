@@ -21,11 +21,12 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use common::approx_equal;
 use iyes_loopless::prelude::*;
+use leafwing_input_manager::prelude::*;
 
 mod common;
 
 pub const CLEAR: Color = Color::BLACK;
-pub const HEIGHT: f32 = 600.0;
+pub const HEIGHT: f32 = 300.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
 
@@ -47,6 +48,7 @@ fn main() {
             },
             ..default()
         }))
+        .add_plugin(InputManagerPlugin::<PlayerActions>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(WorldInspectorPlugin)
@@ -56,6 +58,7 @@ fn main() {
         .add_enter_system_set(
             GameState::InGame,
             ConditionSet::new()
+                .with_system(setup_player_input)
                 .with_system(spawn_camera)
                 .with_system(spawn_ground)
                 .with_system(spawn_dirt)
@@ -67,6 +70,7 @@ fn main() {
                 .with_system(update_selection_tile_color)
                 .with_system(update_under_cursor)
                 .with_system(move_selected)
+                .with_system(build_at_cursor)
                 .into(),
         )
         .run();
@@ -115,13 +119,9 @@ fn update_under_cursor(
             100.0,
         );
 
-        if let Some((hit, RayIntersection { point, .. })) = context.cast_ray_and_get_normal(
-            from,
-            to,
-            Real::MAX,
-            false,
-            QueryFilter::default(),
-        ) {
+        if let Some((hit, RayIntersection { point, .. })) =
+            context.cast_ray_and_get_normal(from, to, Real::MAX, false, QueryFilter::default())
+        {
             commands.insert_resource(UnderCursor {
                 _target: hit,
                 intersection: point,
@@ -348,4 +348,32 @@ impl BuildGrid {
 enum GameState {
     StartMenu,
     InGame,
+}
+
+#[derive(Actionlike, Clone)]
+enum PlayerActions {
+    BuildAtCursor,
+}
+
+#[derive(Component)]
+struct Player {
+    number: u32,
+}
+
+fn setup_player_input(mut commands: Commands) {
+    commands.spawn((
+        Player { number: 0 },
+        InputManagerBundle::<PlayerActions> {
+            input_map: InputMap::new([(KeyCode::B, PlayerActions::BuildAtCursor)]),
+            ..default()
+        },
+    ));
+}
+
+fn build_at_cursor(action_states: Query<&ActionState<PlayerActions>, With<Player>>) {
+    for state in action_states.iter() {
+        if state.just_pressed(PlayerActions::BuildAtCursor) {
+            println!("Action!");
+        }
+    }
 }
