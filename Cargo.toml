@@ -6,12 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.9"
-bevy-inspector-egui = "0.17"
-bevy_rapier3d = "0.20"
-bevy_egui = "0.19"
-iyes_loopless = "0.9"
-leafwing-input-manager = "0.7"
+bevy = "0.10"
+bevy_ecs_tilemap = { git = "https://github.com/geieredgar/bevy_ecs_tilemap", branch = "bevy_track"}
 
 [profile.dev]
 opt-level = 1
