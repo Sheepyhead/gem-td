@@ -62,12 +62,14 @@ fn main() {
         .add_plugin(TilemapPlugin)
         .add_plugin(ShapePlugin)
         // Internal plugins
+        .add_event::<Damaged>()
         .init_resource::<CursorPos>()
         .add_startup_system(startup)
         .add_system(update_cursor_pos)
         .add_system(pick_tile_under_cursor)
         .add_system(BasicTower::update)
         .add_system(fadeout)
+        .add_system(Damaged::consume)
         .run();
 }
 
@@ -117,21 +119,27 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     timer.tick(Duration::from_secs_f32(2.99));
 
     let creep = commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load("creep.png"),
-            transform: Transform::from_xyz(128.0, 0.0, 10.0),
-            ..default()
-        })
-        .insert(Creep)
+        .spawn((
+            SpriteBundle {
+                texture: asset_server.load("creep.png"),
+                transform: Transform::from_xyz(128.0, 0.0, 10.0),
+                ..default()
+            },
+            Creep,
+            HitPoints::new(100),
+        ))
         .id();
 
-    commands
-        .spawn(SpriteBundle {
+    commands.spawn((
+        SpriteBundle {
             texture: asset_server.load("chippedemerald.png"),
             transform: Transform::from_xyz(0.0, 32.0, 10.0),
             ..default()
-        })
-        .insert((BasicTower, Cooldown(timer), Target(creep)));
+        },
+        BasicTower,
+        Cooldown(timer),
+        Target(creep),
+    ));
 }
 
 #[derive(Component)]
@@ -144,6 +152,7 @@ impl BasicTower {
     pub fn update(
         mut commands: Commands,
         time: Res<Time>,
+        mut writer: EventWriter<Damaged>,
         mut towers: Query<(&mut Cooldown, &Target, &Transform), With<BasicTower>>,
         positions: Query<&Transform, Without<BasicTower>>,
     ) {
@@ -161,6 +170,10 @@ impl BasicTower {
                         Stroke::new(Color::RED, 3.0),
                         Fadeout(Timer::from_seconds(0.25, TimerMode::Once)),
                     ));
+                    writer.send(Damaged {
+                        target: **target,
+                        value: 25,
+                    });
                 }
             }
         }
@@ -184,6 +197,43 @@ struct Fadeout(Timer);
 #[derive(Component)]
 struct Creep;
 
+struct Damaged {
+    target: Entity,
+    value: u32,
+}
+
+impl Damaged {
+    fn consume(mut reader: EventReader<Damaged>, mut targets: Query<&mut HitPoints>) {
+        for damaged in &mut reader {
+            if let Ok(hitpoints) = targets.get_mut(damaged.target) {
+                dbg!(hitpoints).sub(damaged.value);
+            }
+        }
+    }
+}
+
+#[derive(Component, Debug)]
+struct HitPoints {
+    max: u32,
+    current: u32,
+}
+
+impl HitPoints {
+    fn new(value: u32) -> Self {
+        Self {
+            max: value,
+            current: value,
+        }
+    }
+
+    fn sub(&mut self, value: u32) {
+        self.current = self.current.checked_sub(value).unwrap_or(0);
+    }
+
+    fn dead(&self) -> bool {
+        self.current == 0
+    }
+}
 // We need to keep the cursor position updated based on any `CursorMoved` events.
 fn update_cursor_pos(
     windows: Query<&Window>,
