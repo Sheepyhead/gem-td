@@ -1,0 +1,28 @@
+Legend, all symbols represent a 4x4 square:
+    o: Open buildable square
+    #: Open buildable square representing the path the creeps take
+    X: Unbuildable square
+
+oooooooooooooooooXoooooooooooo
+XXXoooooXXX#####XXoooooooooooo
+oXoooooooXoooooooXoooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+o#ooooooo#ooooooo#oooooooooooo
+oXooooooo#oooooooXoooooooooooo
+oXX#############XXXooooooooooo
+oXooooooo#oooooooooooooooooooo
+ooooooooo#oooooooooooooooooooo
+ooooooooo#oooooooooooooooooooo
+ooooooooo#oooooooooooooooooooo
+ooooooooo#oooooooooooooooooooo
+ooooooooo#oooooooooooooooooooo
+oooooooooXoooooooooooooooooooo
+oooooooooXX################XXX
+oooooooooXooooooooooooooooooXo

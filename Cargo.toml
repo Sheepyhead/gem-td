@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bevy = "0.10"
 bevy_ecs_tilemap = { git = "https://github.com/geieredgar/bevy_ecs_tilemap", branch = "bevy_track"}
+bevy_prototype_lyon = "0.8"
 
 [profile.dev]
 opt-level = 1

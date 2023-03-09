@@ -16,11 +16,21 @@
 )]
 #![feature(is_some_and)]
 
-use bevy::{prelude::*, window::WindowResolution};
+use std::time::Duration;
+
+use bevy::{
+    math::{Vec3Swizzles, Vec4Swizzles},
+    prelude::*,
+    window::WindowResolution,
+};
 use bevy_ecs_tilemap::prelude::*;
+use bevy_prototype_lyon::prelude::*;
+use common::{cursor_pos_in_world, CursorPos};
+
+mod common;
 
 pub const CLEAR: Color = Color::BLACK;
-pub const HEIGHT: f32 = 600.0;
+pub const WINDOW_HEIGHT: f32 = 600.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
 
@@ -36,7 +46,10 @@ fn main() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: WindowResolution::new(HEIGHT * RESOLUTION, HEIGHT),
+                        resolution: WindowResolution::new(
+                            WINDOW_HEIGHT * RESOLUTION,
+                            WINDOW_HEIGHT,
+                        ),
 
                         title: "GEM TD".to_string(),
                         resizable: false,
@@ -47,12 +60,19 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_plugin(TilemapPlugin)
+        .add_plugin(ShapePlugin)
         // Internal plugins
+        .init_resource::<CursorPos>()
         .add_startup_system(startup)
+        .add_system(update_cursor_pos)
+        .add_system(pick_tile_under_cursor)
+        .add_system(BasicTower::update)
+        .add_system(fadeout)
         .run();
 }
 
-const QUADRANT_SIDE_LENGTH: u32 = 80;
+const MAP_WIDTH: u32 = 4 * 4; // Originally 30 * 4
+const MAP_HEIGHT: u32 = 4 * 4; // Originally 22 * 4
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2dBundle::default());
@@ -60,57 +80,18 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let texture_handle: Handle<Image> = asset_server.load("iso_color.png");
 
     let map_size = TilemapSize {
-        x: QUADRANT_SIDE_LENGTH * 2,
-        y: QUADRANT_SIDE_LENGTH * 2,
+        x: MAP_WIDTH,
+        y: MAP_HEIGHT,
     };
-    let quadrant_size = TilemapSize {
-        x: QUADRANT_SIDE_LENGTH,
-        y: QUADRANT_SIDE_LENGTH,
-    };
+
     let mut tile_storage = TileStorage::empty(map_size);
     let tilemap_entity = commands.spawn_empty().id();
     let tilemap_id = TilemapId(tilemap_entity);
 
     fill_tilemap_rect(
-        TileTextureIndex(0),
-        TilePos { x: 0, y: 0 },
-        quadrant_size,
-        tilemap_id,
-        &mut commands,
-        &mut tile_storage,
-    );
-
-    fill_tilemap_rect(
-        TileTextureIndex(1),
-        TilePos {
-            x: QUADRANT_SIDE_LENGTH,
-            y: 0,
-        },
-        quadrant_size,
-        tilemap_id,
-        &mut commands,
-        &mut tile_storage,
-    );
-
-    fill_tilemap_rect(
         TileTextureIndex(2),
-        TilePos {
-            x: 0,
-            y: QUADRANT_SIDE_LENGTH,
-        },
-        quadrant_size,
-        tilemap_id,
-        &mut commands,
-        &mut tile_storage,
-    );
-
-    fill_tilemap_rect(
-        TileTextureIndex(3),
-        TilePos {
-            x: QUADRANT_SIDE_LENGTH,
-            y: QUADRANT_SIDE_LENGTH,
-        },
-        quadrant_size,
+        TilePos { x: 0, y: 0 },
+        map_size,
         tilemap_id,
         &mut commands,
         &mut tile_storage,
@@ -118,7 +99,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     let tile_size = TilemapTileSize { x: 64.0, y: 32.0 };
     let grid_size = tile_size.into();
-    let map_type = TilemapType::Isometric(IsoCoordSystem::Staggered);
+    let map_type = TilemapType::Isometric(IsoCoordSystem::Diamond);
 
     commands.entity(tilemap_entity).insert(TilemapBundle {
         grid_size,
@@ -128,6 +109,158 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         tile_size,
         map_type,
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
-        ..Default::default()
+        ..default()
     });
+
+    // Make a cooldown timer that starts in a finished state
+    let mut timer = Timer::from_seconds(3.0, TimerMode::Repeating);
+    timer.tick(Duration::from_secs_f32(2.99));
+
+    let creep = commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load("creep.png"),
+            transform: Transform::from_xyz(128.0, 0.0, 10.0),
+            ..default()
+        })
+        .insert(Creep)
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load("chippedemerald.png"),
+            transform: Transform::from_xyz(0.0, 32.0, 10.0),
+            ..default()
+        })
+        .insert((BasicTower, Cooldown(timer), Target(creep)));
+}
+
+#[derive(Component)]
+struct BasicTower;
+
+#[derive(Component, Deref, DerefMut)]
+struct Target(Entity);
+
+impl BasicTower {
+    pub fn update(
+        mut commands: Commands,
+        time: Res<Time>,
+        mut towers: Query<(&mut Cooldown, &Target, &Transform), With<BasicTower>>,
+        positions: Query<&Transform, Without<BasicTower>>,
+    ) {
+        for (mut cooldown, target, tower_pos) in &mut towers {
+            if cooldown.tick(time.delta()).just_finished() {
+                if let Ok(target_pos) = positions.get(**target) {
+                    let beam =
+                        shapes::Line(tower_pos.translation.xy(), target_pos.translation.xy());
+                    commands.spawn((
+                        ShapeBundle {
+                            path: GeometryBuilder::build_as(&beam),
+                            transform: Transform::from_xyz(0.0, 0.0, 100.0),
+                            ..default()
+                        },
+                        Stroke::new(Color::RED, 3.0),
+                        Fadeout(Timer::from_seconds(0.25, TimerMode::Once)),
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn fadeout(mut commands: Commands, time: Res<Time>, mut fadeouts: Query<(Entity, &mut Fadeout)>) {
+    for (entity, mut timer) in &mut fadeouts {
+        if timer.tick(time.delta()).finished() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
+#[derive(Component, Deref, DerefMut)]
+struct Cooldown(Timer);
+
+#[derive(Component, Deref, DerefMut)]
+struct Fadeout(Timer);
+
+#[derive(Component)]
+struct Creep;
+
+// We need to keep the cursor position updated based on any `CursorMoved` events.
+fn update_cursor_pos(
+    windows: Query<&Window>,
+    camera_q: Query<(&Transform, &Camera)>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut cursor_pos: ResMut<CursorPos>,
+) {
+    let window = windows.single();
+    for cursor_moved in cursor_moved_events.iter() {
+        // To get the mouse's world position, we have to transform its window position by
+        // any transforms on the camera. This is done by projecting the cursor position into
+        // camera space (world space).
+        for (cam_t, cam) in camera_q.iter() {
+            *cursor_pos = CursorPos(cursor_pos_in_world(
+                window,
+                cursor_moved.position,
+                cam_t,
+                cam,
+            ));
+        }
+    }
+}
+
+#[derive(Component)]
+enum TileHighlight {
+    Valid,
+}
+
+fn pick_tile_under_cursor(
+    mut commands: Commands,
+    cursor_pos: Res<CursorPos>,
+    tilemap_q: Query<(
+        &TilemapSize,
+        &TilemapGridSize,
+        &TilemapType,
+        &TileStorage,
+        &Transform,
+    )>,
+    existing_highlights: Query<Entity, &TileHighlight>,
+) {
+    for entity in &existing_highlights {
+        commands
+            .entity(entity)
+            .remove::<TileHighlight>()
+            .insert(TileTextureIndex(2));
+    }
+
+    for (map_size, grid_size, map_type, tile_storage, map_transform) in &tilemap_q {
+        // Grab the cursor position from the `Res<CursorPos>`
+        let cursor_pos: Vec3 = cursor_pos.0;
+        // We need to make sure that the cursor's world position is correct relative to the map
+        // due to any map transformation.
+        let cursor_in_map_pos: Vec2 = {
+            // Extend the cursor_pos vec3 by 1.0
+            let cursor_pos = Vec4::from((cursor_pos, 1.0));
+            let cursor_in_map_pos = map_transform.compute_matrix().inverse() * cursor_pos;
+            cursor_in_map_pos.xy()
+        };
+        // Once we have a world position we can transform it into a possible tile position.
+        if let Some(tile_pos) =
+            TilePos::from_world_pos(&cursor_in_map_pos, map_size, grid_size, map_type)
+        {
+            // Highlight the relevant tile's label
+            [
+                (tile_pos.x, tile_pos.y),
+                (tile_pos.x + 1, tile_pos.y),
+                (tile_pos.x, tile_pos.y.checked_sub(1).unwrap_or(0)),
+                (tile_pos.x + 1, tile_pos.y.checked_sub(1).unwrap_or(0)),
+            ]
+            .iter()
+            .copied()
+            .flat_map(|(x, y)| tile_storage.checked_get(&TilePos { x, y }))
+            .for_each(|entity| {
+                commands
+                    .entity(entity)
+                    .insert((TileHighlight::Valid, TileTextureIndex(1)));
+            });
+        }
+    }
 }
