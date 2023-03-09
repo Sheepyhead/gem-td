@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-
 // Converts the cursor position into a world position, taking into account any transforms applied
 // the camera.
 pub fn cursor_pos_in_world(
@@ -26,4 +25,10 @@ impl Default for CursorPos {
         // correctly when the cursor moves.
         Self(Vec3::new(-1000.0, -1000.0, 0.0))
     }
+}
+
+#[derive(Component)]
+pub struct TrackWorldObjectToScreenPosition {
+    pub target: Entity,
+    pub offset: Vec2,
 }
