@@ -21,11 +21,12 @@ use std::time::Duration;
 use bevy::{
     math::{Vec3Swizzles, Vec4Swizzles},
     prelude::*,
+    transform::systems::propagate_transforms,
     window::WindowResolution,
 };
 use bevy_ecs_tilemap::prelude::*;
 use bevy_prototype_lyon::prelude::*;
-use common::{cursor_pos_in_world, CursorPos, TrackWorldObjectToScreenPosition};
+use common::{cursor_pos_in_world, CursorPos, MovingTo, TrackWorldObjectToScreenPosition};
 use progress_bar::ProgressBar;
 
 mod common;
@@ -72,7 +73,8 @@ fn main() {
         .add_system(BasicTower::update)
         .add_system(fadeout)
         .add_system(Damaged::consume)
-        .add_system(track_world_object_to_screen_position)
+        .add_system(TrackWorldObjectToScreenPosition::track)
+        .add_system(MovingTo::move_to)
         .run();
 }
 
@@ -130,6 +132,9 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             },
             Creep,
             HitPoints::new(100),
+            MovingTo {
+                destination: Vec2::splat(-100.0),
+            },
         ))
         .id();
 
@@ -158,36 +163,6 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             target: creep,
             offset: Vec2::new(0.0, 21.0),
         });
-}
-
-fn track_world_object_to_screen_position(
-    cameras: Query<(&GlobalTransform, &Camera)>,
-    world_objects: Query<&GlobalTransform>,
-    mut tracking_objects: Query<(&mut Style, &TrackWorldObjectToScreenPosition)>,
-) {
-    for (mut style, TrackWorldObjectToScreenPosition { target, offset }) in &mut tracking_objects {
-        if let Ok(world_pos) = world_objects.get(*target) {
-            if let Size {
-                width: Val::Px(width),
-                height: Val::Px(height),
-            } = style.size
-            {
-                let (cam_pos, camera) = cameras.single();
-                if let Some(screen_position) =
-                    camera.world_to_viewport(cam_pos, world_pos.translation())
-                {
-                    let new_pos = UiRect::new(
-                        Val::Px(screen_position.x - width / 2.0 + offset.x),
-                        Val::Auto,
-                        Val::Px(screen_position.y - height / 2.0 + offset.y),
-                        Val::Auto,
-                    );
-
-                    style.position = new_pos;
-                }
-            }
-        }
-    }
 }
 
 #[derive(Component)]
