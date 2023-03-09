@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
 #[derive(Component)]
-pub struct ProgressBar;
+pub struct ProgressBar {
+    pub target: Entity,
+}
 
 impl ProgressBar {
     pub fn spawn(
@@ -9,6 +11,7 @@ impl ProgressBar {
         foreground_color: Color,
         background_color: Color,
         progress: f32,
+        target: Entity,
         commands: &mut Commands,
     ) -> Entity {
         commands
@@ -37,7 +40,7 @@ impl ProgressBar {
                         },
                         ..default()
                     },
-                    ProgressBar,
+                    ProgressBar { target },
                 ));
             })
             .id()

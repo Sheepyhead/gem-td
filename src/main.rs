@@ -21,7 +21,6 @@ use std::time::Duration;
 use bevy::{
     math::{Vec3Swizzles, Vec4Swizzles},
     prelude::*,
-    transform::systems::propagate_transforms,
     window::WindowResolution,
 };
 use bevy_ecs_tilemap::prelude::*;
@@ -66,15 +65,20 @@ fn main() {
         .add_plugin(ShapePlugin)
         // Internal plugins
         .add_event::<Damaged>()
+        .add_event::<Dead>()
         .init_resource::<CursorPos>()
         .add_startup_system(startup)
-        .add_system(update_cursor_pos)
-        .add_system(pick_tile_under_cursor)
-        .add_system(BasicTower::update)
-        .add_system(fadeout)
-        .add_system(Damaged::consume)
-        .add_system(TrackWorldObjectToScreenPosition::track)
-        .add_system(MovingTo::move_to)
+        .add_systems((
+            update_cursor_pos,
+            pick_tile_under_cursor,
+            BasicTower::update,
+            fadeout,
+            Damaged::consume,
+            TrackWorldObjectToScreenPosition::track,
+            MovingTo::move_to,
+            update_health_bars,
+            Dead::death,
+        ))
         .run();
 }
 
@@ -153,7 +157,8 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         (WINDOW_HEIGHT * RESOLUTION / 2.0, WINDOW_HEIGHT / 2.0).into(),
         Color::GREEN,
         Color::RED,
-        0.5,
+        1.0,
+        creep,
         &mut commands,
     );
 
@@ -226,10 +231,17 @@ struct Damaged {
 }
 
 impl Damaged {
-    fn consume(mut reader: EventReader<Damaged>, mut targets: Query<&mut HitPoints>) {
+    fn consume(
+        mut reader: EventReader<Damaged>,
+        mut writer: EventWriter<Dead>,
+        mut targets: Query<&mut HitPoints>,
+    ) {
         for damaged in &mut reader {
-            if let Ok(hitpoints) = targets.get_mut(damaged.target) {
-                dbg!(hitpoints).sub(damaged.value);
+            if let Ok(mut hitpoints) = targets.get_mut(damaged.target) {
+                hitpoints.sub(damaged.value);
+                if hitpoints.dead() {
+                    writer.send(Dead(damaged.target));
+                }
             }
         }
     }
@@ -255,6 +267,10 @@ impl HitPoints {
 
     fn dead(&self) -> bool {
         self.current == 0
+    }
+
+    fn ratio(&self) -> f32 {
+        self.current as f32 / self.max as f32
     }
 }
 // We need to keep the cursor position updated based on any `CursorMoved` events.
@@ -334,6 +350,37 @@ fn pick_tile_under_cursor(
                     .entity(entity)
                     .insert((TileHighlight::Valid, TileTextureIndex(1)));
             });
+        }
+    }
+}
+
+fn update_health_bars(
+    mut health_bars: Query<(&mut Style, &ProgressBar)>,
+    hitpoints: Query<&HitPoints, Changed<HitPoints>>,
+) {
+    for (mut style, bar) in &mut health_bars {
+        if let Ok(hitpoints) = hitpoints.get(bar.target) {
+            style.size.width = Val::Percent(hitpoints.ratio() * 100.0);
+        }
+    }
+}
+
+#[derive(Deref, DerefMut)]
+struct Dead(Entity);
+
+impl Dead {
+    fn death(
+        mut commands: Commands,
+        mut reader: EventReader<Dead>,
+        bars: Query<(&ProgressBar, &Parent)>,
+    ) {
+        for Dead(dead) in reader.iter() {
+            commands.entity(*dead).despawn_recursive();
+            for (bar, parent) in bars.iter() {
+                if bar.target == *dead {
+                    commands.entity(**parent).despawn_recursive();
+                }
+            }
         }
     }
 }

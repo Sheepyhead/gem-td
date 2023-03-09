@@ -51,7 +51,7 @@ impl TrackWorldObjectToScreenPosition {
                 {
                     let (cam_pos, camera) = cameras.single();
                     if let Some(screen_position) =
-                        camera.world_to_viewport(cam_pos, dbg!(world_pos.translation()))
+                        camera.world_to_viewport(cam_pos, world_pos.translation())
                     {
                         let window = windows.single();
                         let new_pos = UiRect::new(
