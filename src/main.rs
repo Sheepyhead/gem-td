@@ -89,6 +89,10 @@ fn main() {
             Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
             TileHighlight::reset_tile_highlights.in_schedule(OnExit(Phase::Build)),
         ))
+        .add_systems((
+            CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
+            check_state_change,
+        ))
         .run();
 }
 
@@ -139,7 +143,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 
     commands.spawn((
-        CreepSpawner(Timer::from_seconds(4.0, TimerMode::Repeating)),
+        CreepSpawner::default(),
         TransformBundle::from_transform(Transform::from_xyz(-100.0, -100.0, 100.0)),
     ));
 }
@@ -149,4 +153,10 @@ pub enum Phase {
     #[default]
     Build,
     Spawn,
+}
+
+fn check_state_change(state: Res<State<Phase>>) {
+    if state.is_changed() {
+        // println!("State changed to {state:?}");
+    }
 }

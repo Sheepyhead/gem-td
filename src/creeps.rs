@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     common::{MovingTo, TrackWorldObjectToScreenPosition},
     progress_bar::ProgressBar,
-    RESOLUTION, WINDOW_HEIGHT,
+    Phase, RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -117,21 +117,41 @@ impl Dead {
     }
 }
 
-#[derive(Component, Deref, DerefMut)]
-pub struct CreepSpawner(pub Timer);
+#[derive(Component)]
+pub struct CreepSpawner {
+    pub timer: Timer,
+    pub amount: u32,
+}
+
+impl Default for CreepSpawner {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(0.3, TimerMode::Repeating),
+            amount: 20,
+        }
+    }
+}
 
 impl CreepSpawner {
     pub fn spawn(
         mut commands: Commands,
+        mut phase: ResMut<NextState<Phase>>,
         asset_server: Res<AssetServer>,
         time: Res<Time>,
         mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
+        creeps: Query<(), With<Creep>>,
     ) {
+        let mut spawns_left = 0;
         for (transform, mut spawner) in &mut spawners {
-            if !spawner.tick(time.delta()).just_finished() {
-                return;
+            if spawner.amount == 0 {
+                continue;
             }
-
+            if !spawner.timer.tick(time.delta()).just_finished() {
+                spawns_left += spawner.amount;
+                continue;
+            }
+            spawner.amount = dbg!(spawner.amount).saturating_sub(1);
+            spawns_left += spawner.amount;
             commands.spawn((
                 SpriteBundle {
                     texture: asset_server.load("creep.png"),
@@ -144,6 +164,15 @@ impl CreepSpawner {
                     destination: Vec2::splat(100.0),
                 },
             ));
+        }
+        if spawns_left == 0 && creeps.iter().count() == 0 && phase.0.is_none() {
+            phase.set(Phase::Build);
+        }
+    }
+
+    pub fn reset_amount_system(mut spawners: Query<&mut CreepSpawner>) {
+        for mut spawner in &mut spawners {
+            spawner.amount = CreepSpawner::default().amount;
         }
     }
 }

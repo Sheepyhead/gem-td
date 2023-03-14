@@ -95,7 +95,8 @@ pub fn build_on_click(
     mut commands: Commands,
     mut mouse: EventReader<MouseButtonInput>,
     mut builds: ResMut<Builds>,
-    mut phase: ResMut<NextState<Phase>>,
+    mut next_phase: ResMut<NextState<Phase>>,
+    phase: Res<State<Phase>>,
     cursor_pos: Res<CursorPos>,
     asset_server: Res<AssetServer>,
     tilemap_q: Query<(
@@ -107,9 +108,9 @@ pub fn build_on_click(
     )>,
     transforms: Query<&TilePos, Without<TileStorage>>,
 ) {
-    // If there are no more builds, and the next phase either hasn't been set yet, o
-    if **builds == 0 && phase.0.as_ref().is_none() {
-        phase.set(Phase::Spawn);
+    // If there are no more builds and the current phase is Build, change phase
+    if **builds == 0 && phase.0 == Phase::Build {
+        next_phase.set(Phase::Spawn);
         return;
     }
 
@@ -148,6 +149,7 @@ pub fn build_on_click(
                                 Target(None),
                             ));
                             **builds -= 1;
+                            dbg!(**builds);
                         }
                     }
                 }
