@@ -140,7 +140,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         MovingTo {
             destination: Vec2::splat(-100.0),
         },
-    )); 
+    ));
 
     commands.spawn((
         SpriteBundle {
@@ -217,7 +217,7 @@ impl BasicTower {
         }
     }
 
-    fn get_closest_creep<'a>(
+    fn get_closest_creep(
         creeps: impl Iterator<Item = (Entity, Vec3)>,
         position: Vec3,
     ) -> Option<(Entity, Vec3)> {
@@ -288,7 +288,7 @@ impl HitPoints {
     }
 
     fn sub(&mut self, value: u32) {
-        self.current = self.current.checked_sub(value).unwrap_or(0);
+        self.current = self.current.saturating_sub(value);
     }
 
     fn dead(&self) -> bool {
@@ -394,12 +394,12 @@ fn pick_tile_under_cursor(
             [
                 (tile_pos.x, tile_pos.y),
                 (tile_pos.x + 1, tile_pos.y),
-                (tile_pos.x, tile_pos.y.checked_sub(1).unwrap_or(0)),
-                (tile_pos.x + 1, tile_pos.y.checked_sub(1).unwrap_or(0)),
+                (tile_pos.x, tile_pos.y.saturating_sub(1)),
+                (tile_pos.x + 1, tile_pos.y.saturating_sub(1)),
             ]
             .iter()
             .copied()
-            .flat_map(|(x, y)| tile_storage.checked_get(&TilePos { x, y }))
+            .filter_map(|(x, y)| tile_storage.checked_get(&TilePos { x, y }))
             .for_each(|entity| {
                 commands
                     .entity(entity)
