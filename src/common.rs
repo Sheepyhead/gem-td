@@ -77,8 +77,8 @@ pub struct MovingTo {
 impl MovingTo {
     pub fn move_to(time: Res<Time>, mut movers: Query<(&mut Transform, &MovingTo)>) {
         for (mut transform, MovingTo { destination }) in &mut movers {
-            let direction = (transform.translation.xy() - *destination).normalize();
-            let movement = direction * 10.0 * time.delta_seconds();
+            let direction = (*destination - transform.translation.xy()).normalize();
+            let movement = Vec2::new(direction.x * 10.0, direction.y * 5.0) * time.delta_seconds();
             transform.translation += movement.extend(0.0);
         }
     }

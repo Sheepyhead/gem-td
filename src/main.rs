@@ -78,6 +78,8 @@ fn main() {
             MovingTo::move_to,
             update_health_bars,
             Dead::death,
+            CreepSpawner::spawn,
+            HitPoints::spawn_hitpoints_bar,
         ))
         .run();
 }
@@ -124,23 +126,21 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 
     // Make a cooldown timer that starts in a finished state
-    let mut timer = Timer::from_seconds(3.0, TimerMode::Repeating);
-    timer.tick(Duration::from_secs_f32(2.99));
+    let mut timer = Timer::from_seconds(0.5, TimerMode::Once);
+    timer.tick(Duration::from_secs_f32(0.5));
 
-    let creep = commands
-        .spawn((
-            SpriteBundle {
-                texture: asset_server.load("creep.png"),
-                transform: Transform::from_xyz(128.0, 0.0, 10.0),
-                ..default()
-            },
-            Creep,
-            HitPoints::new(100),
-            MovingTo {
-                destination: Vec2::splat(-100.0),
-            },
-        ))
-        .id();
+    commands.spawn((
+        SpriteBundle {
+            texture: asset_server.load("creep.png"),
+            transform: Transform::from_xyz(128.0, 0.0, 10.0),
+            ..default()
+        },
+        Creep,
+        HitPoints::new(100),
+        MovingTo {
+            destination: Vec2::splat(-100.0),
+        },
+    )); 
 
     commands.spawn((
         SpriteBundle {
@@ -150,61 +150,87 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         },
         BasicTower,
         Cooldown(timer),
-        Target(creep),
+        Target(None),
     ));
 
-    let bar = ProgressBar::spawn(
-        (WINDOW_HEIGHT * RESOLUTION / 2.0, WINDOW_HEIGHT / 2.0).into(),
-        Color::GREEN,
-        Color::RED,
-        1.0,
-        creep,
-        &mut commands,
-    );
-
-    commands
-        .entity(bar)
-        .insert(TrackWorldObjectToScreenPosition {
-            target: creep,
-            offset: Vec2::new(0.0, 21.0),
-        });
+    commands.spawn((
+        CreepSpawner(Timer::from_seconds(4.0, TimerMode::Repeating)),
+        TransformBundle::from_transform(Transform::from_xyz(-100.0, -100.0, 100.0)),
+    ));
 }
 
 #[derive(Component)]
 struct BasicTower;
 
 #[derive(Component, Deref, DerefMut)]
-struct Target(Entity);
+struct Target(Option<Entity>);
 
 impl BasicTower {
     pub fn update(
         mut commands: Commands,
         time: Res<Time>,
         mut writer: EventWriter<Damaged>,
-        mut towers: Query<(&mut Cooldown, &Target, &Transform), With<BasicTower>>,
-        positions: Query<&Transform, Without<BasicTower>>,
+        mut towers: Query<(&mut Cooldown, &mut Target, &GlobalTransform), With<BasicTower>>,
+        positions: Query<(Entity, &Transform), (Without<BasicTower>, With<HitPoints>)>,
     ) {
-        for (mut cooldown, target, tower_pos) in &mut towers {
-            if cooldown.tick(time.delta()).just_finished() {
-                if let Ok(target_pos) = positions.get(**target) {
-                    let beam =
-                        shapes::Line(tower_pos.translation.xy(), target_pos.translation.xy());
-                    commands.spawn((
-                        ShapeBundle {
-                            path: GeometryBuilder::build_as(&beam),
-                            transform: Transform::from_xyz(0.0, 0.0, 100.0),
-                            ..default()
-                        },
-                        Stroke::new(Color::RED, 3.0),
-                        Fadeout(Timer::from_seconds(0.25, TimerMode::Once)),
-                    ));
-                    writer.send(Damaged {
-                        target: **target,
-                        value: 25,
-                    });
+        for (mut cooldown, mut target, tower_pos) in &mut towers {
+            cooldown.tick(time.delta());
+            if cooldown.finished() {
+                if let Some(target_entity) = **target {
+                    // Tower has a target
+                    if let Ok((_, target_pos)) = positions.get(target_entity) {
+                        // Target is alive
+                        cooldown.reset();
+                        let beam =
+                            shapes::Line(tower_pos.translation().xy(), target_pos.translation.xy());
+                        commands.spawn((
+                            ShapeBundle {
+                                path: GeometryBuilder::build_as(&beam),
+                                transform: Transform::from_xyz(0.0, 0.0, 100.0),
+                                ..default()
+                            },
+                            Stroke::new(Color::RED, 3.0),
+                            Fadeout(Timer::from_seconds(0.25, TimerMode::Once)),
+                        ));
+                        writer.send(Damaged {
+                            target: target_entity,
+                            value: 25,
+                        });
+                    } else {
+                        // Target is dead
+                        **target = None;
+                    }
+                } else {
+                    // Tower needs to find a new target
+                    let closest = Self::get_closest_creep(
+                        positions
+                            .iter()
+                            .map(|(entity, position)| (entity, position.translation)),
+                        tower_pos.translation(),
+                    );
+
+                    if let Some((creep, _)) = closest {
+                        **target = Some(creep);
+                    }
                 }
             }
         }
+    }
+
+    fn get_closest_creep<'a>(
+        creeps: impl Iterator<Item = (Entity, Vec3)>,
+        position: Vec3,
+    ) -> Option<(Entity, Vec3)> {
+        let mut closest = None;
+        let mut closest_distance_squared = f32::MAX;
+        for (creep, creep_pos) in creeps {
+            let distance_squared = creep_pos.distance_squared(position);
+            if distance_squared < closest_distance_squared {
+                closest = Some((creep, creep_pos));
+                closest_distance_squared = distance_squared;
+            }
+        }
+        closest
     }
 }
 
@@ -272,7 +298,36 @@ impl HitPoints {
     fn ratio(&self) -> f32 {
         self.current as f32 / self.max as f32
     }
+
+    fn spawn_hitpoints_bar(
+        mut commands: Commands,
+        hitpoints: Query<(Entity, &HitPoints), Added<HitPoints>>,
+    ) {
+        for (entity, hitpoints) in &hitpoints {
+            let bar = ProgressBar::spawn(
+                (WINDOW_HEIGHT * RESOLUTION / 2.0, WINDOW_HEIGHT / 2.0).into(),
+                Color::GREEN,
+                Color::RED,
+                hitpoints.ratio(),
+                entity,
+                &mut commands,
+            );
+
+            commands
+                .entity(bar)
+                .insert(TrackWorldObjectToScreenPosition {
+                    target: entity,
+                    offset: Vec2::new(0.0, 21.0),
+                });
+
+            commands.entity(entity).insert(UpdateHitpointsBar(bar));
+        }
+    }
 }
+
+#[derive(Component)]
+struct UpdateHitpointsBar(Entity);
+
 // We need to keep the cursor position updated based on any `CursorMoved` events.
 fn update_cursor_pos(
     windows: Query<&Window>,
@@ -381,6 +436,37 @@ impl Dead {
                     commands.entity(**parent).despawn_recursive();
                 }
             }
+        }
+    }
+}
+
+#[derive(Component, Deref, DerefMut)]
+struct CreepSpawner(Timer);
+
+impl CreepSpawner {
+    fn spawn(
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        time: Res<Time>,
+        mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
+    ) {
+        for (transform, mut spawner) in &mut spawners {
+            if !spawner.tick(time.delta()).just_finished() {
+                return;
+            }
+
+            commands.spawn((
+                SpriteBundle {
+                    texture: asset_server.load("creep.png"),
+                    transform: transform.compute_transform(),
+                    ..default()
+                },
+                Creep,
+                HitPoints::new(100),
+                MovingTo {
+                    destination: Vec2::splat(100.0),
+                },
+            ));
         }
     }
 }
