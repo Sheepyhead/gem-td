@@ -16,15 +16,16 @@
 )]
 #![feature(is_some_and)]
 
-use std::time::Duration;
-
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_prototype_lyon::prelude::*;
-use common::{CursorPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition};
-use controls::{pick_tile_under_cursor, update_cursor_pos};
-use creeps::{Creep, CreepSpawner, Damaged, Dead, HitPoints};
-use towers::{BasicTower, Cooldown, Target};
+use common::{
+    clamp_z_order_to_y, AvoidZOrderClamping, Builds, CursorPos, Fadeout, MovingTo,
+    TrackWorldObjectToScreenPosition,
+};
+use controls::{build_on_click, highlight_tile_under_cursor, update_cursor_pos, TileHighlight};
+use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
+use towers::BasicTower;
 
 mod common;
 mod controls;
@@ -65,22 +66,28 @@ fn main() {
         .add_plugin(TilemapPlugin)
         .add_plugin(ShapePlugin)
         // Internal plugins
+        .add_state::<Phase>()
         .add_event::<Damaged>()
         .add_event::<Dead>()
         .init_resource::<CursorPos>()
+        .init_resource::<Builds>()
         .add_startup_system(startup)
         .add_systems((
             update_cursor_pos,
-            pick_tile_under_cursor,
+            highlight_tile_under_cursor.in_set(OnUpdate(Phase::Build)),
+            build_on_click,
             BasicTower::update,
             Fadeout::fadeout,
             Damaged::consume,
             TrackWorldObjectToScreenPosition::track,
             MovingTo::move_to,
             Dead::death,
-            CreepSpawner::spawn,
+            CreepSpawner::spawn.in_set(OnUpdate(Phase::Spawn)),
             HitPoints::spawn_health_bars,
             HitPoints::update_health_bars,
+            clamp_z_order_to_y,
+            Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
+            TileHighlight::reset_tile_highlights.in_schedule(OnExit(Phase::Build)),
         ))
         .run();
 }
@@ -89,7 +96,9 @@ const MAP_WIDTH: u32 = 4 * 4; // Originally 30 * 4
 const MAP_HEIGHT: u32 = 4 * 4; // Originally 22 * 4
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(Camera2dBundle::default());
+    let mut camera = Camera2dBundle::new_with_far(20_000.0);
+    camera.transform = Transform::from_xyz(0.0, 0.0, 10_000.0);
+    commands.spawn((camera, AvoidZOrderClamping));
 
     let texture_handle: Handle<Image> = asset_server.load("iso_color.png");
 
@@ -115,47 +124,29 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let grid_size = tile_size.into();
     let map_type = TilemapType::Isometric(IsoCoordSystem::Diamond);
 
-    commands.entity(tilemap_entity).insert(TilemapBundle {
-        grid_size,
-        size: map_size,
-        storage: tile_storage,
-        texture: TilemapTexture::Single(texture_handle),
-        tile_size,
-        map_type,
-        transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
-        ..default()
-    });
-
-    // Make a cooldown timer that starts in a finished state
-    let mut timer = Timer::from_seconds(0.5, TimerMode::Once);
-    timer.tick(Duration::from_secs_f32(0.5));
-
-    commands.spawn((
-        SpriteBundle {
-            texture: asset_server.load("creep.png"),
-            transform: Transform::from_xyz(128.0, 0.0, 10.0),
+    commands.entity(tilemap_entity).insert((
+        TilemapBundle {
+            grid_size,
+            size: map_size,
+            storage: tile_storage,
+            texture: TilemapTexture::Single(texture_handle),
+            tile_size,
+            map_type,
+            transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, -9_999.0),
             ..default()
         },
-        Creep,
-        HitPoints::new(100),
-        MovingTo {
-            destination: Vec2::splat(-100.0),
-        },
-    ));
-
-    commands.spawn((
-        SpriteBundle {
-            texture: asset_server.load("chippedemerald.png"),
-            transform: Transform::from_xyz(0.0, 32.0, 10.0),
-            ..default()
-        },
-        BasicTower,
-        Cooldown(timer),
-        Target(None),
+        AvoidZOrderClamping,
     ));
 
     commands.spawn((
         CreepSpawner(Timer::from_seconds(4.0, TimerMode::Repeating)),
         TransformBundle::from_transform(Transform::from_xyz(-100.0, -100.0, 100.0)),
     ));
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, States)]
+pub enum Phase {
+    #[default]
+    Build,
+    Spawn,
 }

@@ -100,3 +100,29 @@ impl Fadeout {
         }
     }
 }
+
+#[derive(Component)]
+pub struct AvoidZOrderClamping;
+
+pub fn clamp_z_order_to_y(
+    mut transforms: Query<&mut Transform, (Without<AvoidZOrderClamping>, Changed<Transform>)>,
+) {
+    for mut transform in &mut transforms {
+        transform.translation.z = -transform.translation.y;
+    }
+}
+
+#[derive(Deref, DerefMut, Resource)]
+pub struct Builds(pub u32);
+
+impl Default for Builds {
+    fn default() -> Self {
+        Self(5)
+    }
+}
+
+impl Builds {
+    pub fn reset_system(mut builds: ResMut<Builds>) {
+        *builds = Self::default();
+    }
+}
