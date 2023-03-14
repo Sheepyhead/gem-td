@@ -83,3 +83,20 @@ impl MovingTo {
         }
     }
 }
+
+#[derive(Component, Deref, DerefMut)]
+pub struct Fadeout(pub Timer);
+
+impl Fadeout {
+    pub fn fadeout(
+        mut commands: Commands,
+        time: Res<Time>,
+        mut fadeouts: Query<(Entity, &mut Fadeout)>,
+    ) {
+        for (entity, mut timer) in &mut fadeouts {
+            if timer.tick(time.delta()).finished() {
+                commands.entity(entity).despawn_recursive();
+            }
+        }
+    }
+}
