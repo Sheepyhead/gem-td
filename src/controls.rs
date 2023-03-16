@@ -37,9 +37,8 @@ pub fn update_cursor_pos(
 }
 
 #[derive(Component)]
-pub enum TileHighlight {
-    Valid,
-}
+pub struct TileHighlight;
+
 impl TileHighlight {
     pub fn reset_tile_highlights(
         mut commands: Commands,
@@ -64,6 +63,7 @@ pub fn highlight_tile_under_cursor(
         &GlobalTransform,
     )>,
     existing_highlights: Query<Entity, With<TileHighlight>>,
+    occupied_tiles: Query<(), With<TileOccupied>>,
 ) {
     for entity in &existing_highlights {
         commands
@@ -77,19 +77,25 @@ pub fn highlight_tile_under_cursor(
             if let Some(tile_pos) =
                 tile_from_cursor_pos(&cursor_pos, map_transform, *map_size, *grid_size, *map_type)
             {
-                // Highlight the relevant tile's label
-
                 if let Some(tiles) = get_square_from_tiles(tile_pos, tile_storage) {
                     for entity in &tiles {
-                        commands
-                            .entity(*entity)
-                            .insert((TileHighlight::Valid, TileTextureIndex(1)));
+                        commands.entity(*entity).insert((
+                            TileHighlight,
+                            TileTextureIndex(if occupied_tiles.contains(*entity) {
+                                3
+                            } else {
+                                1
+                            }),
+                        ));
                     }
                 }
             }
         }
     }
 }
+
+#[derive(Component)]
+pub struct TileOccupied;
 
 pub fn build_on_click(
     mut commands: Commands,
@@ -106,7 +112,7 @@ pub fn build_on_click(
         &TileStorage,
         &GlobalTransform,
     )>,
-    transforms: Query<&TilePos, Without<TileStorage>>,
+    tile_positions: Query<(Option<&TileOccupied>, &TilePos)>,
 ) {
     // If there are no more builds and the current phase is Build, change phase
     if **builds == 0 && phase.0 == Phase::Build {
@@ -120,7 +126,9 @@ pub fn build_on_click(
             state: ButtonState::Pressed,
         } = event
         {
-            for (map_size, grid_size, map_type, tile_storage, map_transform) in &tilemap_q {
+            'tilemaps: for (map_size, grid_size, map_type, tile_storage, map_transform) in
+                &tilemap_q
+            {
                 if let Some(pos) = tile_from_cursor_pos(
                     &cursor_pos,
                     map_transform,
@@ -129,28 +137,48 @@ pub fn build_on_click(
                     *map_type,
                 ) {
                     if let Some(tiles) = get_square_from_tiles(pos, tile_storage) {
-                        if let Ok(tile_pos) = transforms.get(*tiles.first().unwrap()) {
-                            let pos = tile_pos.center_in_world(grid_size, map_type).extend(0.0)
-                                + Vec3::new(0.0, 16.0, 10.0)
-                                + map_transform.translation();
-
-                            // Make a cooldown timer that starts in a finished state
-                            let mut timer = Timer::from_seconds(0.5, TimerMode::Once);
-                            timer.tick(Duration::from_secs_f32(0.5));
-
-                            commands.spawn((
-                                SpriteBundle {
-                                    texture: asset_server.load("chippedemerald.png"),
-                                    transform: Transform::from_translation(pos),
-                                    ..default()
-                                },
-                                BasicTower,
-                                Cooldown(timer),
-                                Target(None),
-                            ));
-                            **builds -= 1;
-                            dbg!(**builds);
+                        let mut tile_pos = None;
+                        for tile in &tiles {
+                            if let Ok((occupied, pos)) = tile_positions.get(*tile) {
+                                if occupied.is_some() {
+                                    continue 'tilemaps;
+                                }
+                                if tile_pos.is_none() {
+                                    tile_pos = Some(pos);
+                                }
+                            } else {
+                                continue 'tilemaps;
+                            }
                         }
+                        if tile_pos.is_none() {
+                            continue;
+                        }
+                        for tile in tiles {
+                            commands.entity(tile).insert(TileOccupied);
+                        }
+                        let pos = tile_pos
+                            .unwrap()
+                            .center_in_world(grid_size, map_type)
+                            .extend(0.0)
+                            + Vec3::new(0.0, 16.0, 10.0)
+                            + map_transform.translation();
+
+                        // Make a cooldown timer that starts in a finished state
+                        let time = 1.0;
+                        let mut timer = Timer::from_seconds(time, TimerMode::Once);
+                        timer.tick(Duration::from_secs_f32(time));
+
+                        commands.spawn((
+                            SpriteBundle {
+                                texture: asset_server.load("chippedemerald.png"),
+                                transform: Transform::from_translation(pos),
+                                ..default()
+                            },
+                            BasicTower,
+                            Cooldown(timer),
+                            Target(None),
+                        ));
+                        **builds -= 1;
                     }
                 }
             }

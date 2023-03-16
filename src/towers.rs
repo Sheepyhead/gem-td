@@ -1,9 +1,13 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
+use bevy_ecs_tilemap::prelude::*;
 use bevy_prototype_lyon::prelude::*;
+use seldom_map_nav::prelude::{Navability, Navmeshes};
 
 use crate::{
     common::Fadeout,
+    controls::TileOccupied,
     creeps::{Damaged, HitPoints},
+    CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE,
 };
 
 #[derive(Component)]
@@ -18,7 +22,7 @@ impl BasicTower {
         time: Res<Time>,
         mut writer: EventWriter<Damaged>,
         mut towers: Query<(&mut Cooldown, &mut Target, &GlobalTransform), With<BasicTower>>,
-        positions: Query<(Entity, &Transform), (Without<BasicTower>, With<HitPoints>)>,
+        positions: Query<(Entity, &Transform), With<HitPoints>>,
     ) {
         for (mut cooldown, mut target, tower_pos) in &mut towers {
             cooldown.tick(time.delta());
@@ -41,7 +45,7 @@ impl BasicTower {
                         ));
                         writer.send(Damaged {
                             target: target_entity,
-                            value: 25,
+                            value: 50,
                         });
                     } else {
                         // Target is dead
@@ -83,3 +87,26 @@ impl BasicTower {
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Cooldown(pub Timer);
+
+pub fn rebuild_navmesh(
+    mut commands: Commands,
+    navmeshes: Query<Entity, With<Navmeshes>>,
+    occupied_tiles: Query<&TilePos, With<TileOccupied>>,
+) {
+    let map = navmeshes.single();
+    let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
+    for pos in &occupied_tiles {
+        // println!("Occupied {:?} ({:?})", pos, pos.center_in_world(size, typ));
+        tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
+    }
+    let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
+    commands.entity(map).insert(
+        Navmeshes::generate(
+            [MAP_WIDTH, MAP_HEIGHT].into(),
+            TILE_SIZE,
+            navability,
+            [CREEP_CLEARANCE],
+        )
+        .unwrap(),
+    );
+}

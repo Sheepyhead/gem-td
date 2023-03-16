@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use seldom_map_nav::prelude::*;
 
 use crate::{
-    common::{MovingTo, TrackWorldObjectToScreenPosition},
-    progress_bar::ProgressBar,
-    Phase, RESOLUTION, WINDOW_HEIGHT,
+    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, IsoPosition, Phase,
+    CREEP_CLEARANCE, RESOLUTION, TILE_SIZE, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -107,10 +107,12 @@ impl Dead {
         bars: Query<(&ProgressBar, &Parent)>,
     ) {
         for Dead(dead) in reader.iter() {
-            commands.entity(*dead).despawn_recursive();
-            for (bar, parent) in bars.iter() {
-                if bar.target == *dead {
-                    commands.entity(**parent).despawn_recursive();
+            if let Some(entity) = commands.get_entity(*dead) {
+                entity.despawn_recursive();
+                for (bar, parent) in bars.iter() {
+                    if bar.target == *dead {
+                        commands.entity(**parent).despawn_recursive();
+                    }
                 }
             }
         }
@@ -127,7 +129,7 @@ impl Default for CreepSpawner {
     fn default() -> Self {
         Self {
             timer: Timer::from_seconds(0.3, TimerMode::Repeating),
-            amount: 20,
+            amount: 10,
         }
     }
 }
@@ -140,6 +142,7 @@ impl CreepSpawner {
         time: Res<Time>,
         mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
         creeps: Query<(), With<Creep>>,
+        navmeshes: Query<Entity, With<Navmeshes>>,
     ) {
         let mut spawns_left = 0;
         for (transform, mut spawner) in &mut spawners {
@@ -150,8 +153,9 @@ impl CreepSpawner {
                 spawns_left += spawner.amount;
                 continue;
             }
-            spawner.amount = dbg!(spawner.amount).saturating_sub(1);
+            spawner.amount = spawner.amount.saturating_sub(1);
             spawns_left += spawner.amount;
+            let navmesh = navmeshes.single();
             commands.spawn((
                 SpriteBundle {
                     texture: asset_server.load("creep.png"),
@@ -159,10 +163,22 @@ impl CreepSpawner {
                     ..default()
                 },
                 Creep,
-                HitPoints::new(100),
-                MovingTo {
-                    destination: Vec2::splat(100.0),
+                HitPoints::new(500),
+                NavBundle {
+                    pathfind: Pathfind::new(
+                        navmesh,
+                        CREEP_CLEARANCE,
+                        None,
+                        PathTarget::Static(Vec2::new(0. * TILE_SIZE.x, 15. * TILE_SIZE.y)),
+                        NavQuery::Accuracy,
+                        NavPathMode::Accuracy,
+                    ),
+                    nav: Nav::new(100.0),
                 },
+                IsoPosition {
+                    pos: Vec2::new(TILE_SIZE.x / 2., TILE_SIZE.y / 2.),
+                },
+                Name::new("Creep"),
             ));
         }
         if spawns_left == 0 && creeps.iter().count() == 0 && phase.0.is_none() {
