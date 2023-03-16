@@ -1,9 +1,9 @@
-use bevy::prelude::{shape::Circle, *};
+use bevy::prelude::{shape::Cube, *};
 use seldom_map_nav::prelude::*;
 
 use crate::{
-    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, Phase, CREEP_CLEARANCE,
-    RESOLUTION, WINDOW_HEIGHT,
+    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, Phase, MAP_HEIGHT,
+    MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -141,12 +141,12 @@ impl CreepSpawner {
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         time: Res<Time>,
-        mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
+        mut spawners: Query<&mut CreepSpawner>,
         creeps: Query<(), With<Creep>>,
         navmeshes: Query<Entity, With<Navmeshes>>,
     ) {
         let mut spawns_left = 0;
-        for (transform, mut spawner) in &mut spawners {
+        for mut spawner in &mut spawners {
             if spawner.amount == 0 {
                 continue;
             }
@@ -156,33 +156,31 @@ impl CreepSpawner {
             }
             spawner.amount = spawner.amount.saturating_sub(1);
             spawns_left += spawner.amount;
-            let navmesh = navmeshes.single();
+            let _navmesh = navmeshes.single();
             commands.spawn((
                 PbrBundle {
-                    mesh: meshes.add(
-                        Circle {
-                            radius: 0.25,
-                            ..default()
-                        }
-                        .into(),
-                    ),
+                    mesh: meshes.add(Cube { size: 0.5 }.into()),
                     material: mats.add(Color::BLACK.into()),
-                    transform: transform.compute_transform(),
+                    transform: Transform::from_xyz(
+                        -(MAP_WIDTH as f32) / 2. + 0.25,
+                        0.25,
+                        (MAP_HEIGHT as f32) / 2. - 0.25,
+                    ),
                     ..default()
                 },
                 Creep,
                 HitPoints::new(500),
-                NavBundle {
-                    pathfind: Pathfind::new(
-                        navmesh,
-                        CREEP_CLEARANCE,
-                        None,
-                        PathTarget::Static(Vec2::new(0., 15.)),
-                        NavQuery::Accuracy,
-                        NavPathMode::Accuracy,
-                    ),
-                    nav: Nav::new(100.0),
-                },
+                // NavBundle {
+                //     pathfind: Pathfind::new(
+                //         navmesh,
+                //         CREEP_CLEARANCE,
+                //         None,
+                //         PathTarget::Static(Vec2::new(0., 15.)),
+                //         NavQuery::Accuracy,
+                //         NavPathMode::Accuracy,
+                //     ),
+                //     nav: Nav::new(100.0),
+                // },
                 Name::new("Creep"),
             ));
         }
