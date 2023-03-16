@@ -2,8 +2,9 @@ use bevy::prelude::{shape::Cube, *};
 use seldom_map_nav::prelude::*;
 
 use crate::{
-    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, Phase, MAP_HEIGHT,
-    MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
+    common::{CreepPos, TrackWorldObjectToScreenPosition},
+    progress_bar::ProgressBar,
+    Phase, CREEP_CLEARANCE, MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -156,31 +157,30 @@ impl CreepSpawner {
             }
             spawner.amount = spawner.amount.saturating_sub(1);
             spawns_left += spawner.amount;
-            let _navmesh = navmeshes.single();
+            let navmesh = navmeshes.single();
             commands.spawn((
                 PbrBundle {
                     mesh: meshes.add(Cube { size: 0.5 }.into()),
                     material: mats.add(Color::BLACK.into()),
-                    transform: Transform::from_xyz(
-                        -(MAP_WIDTH as f32) / 2. + 0.25,
-                        0.25,
-                        (MAP_HEIGHT as f32) / 2. - 0.25,
-                    ),
+                    transform: Transform::from_xyz(0.5, 0.25, 0.5 + MAP_WIDTH as f32 - 1.),
                     ..default()
                 },
                 Creep,
-                HitPoints::new(500),
-                // NavBundle {
-                //     pathfind: Pathfind::new(
-                //         navmesh,
-                //         CREEP_CLEARANCE,
-                //         None,
-                //         PathTarget::Static(Vec2::new(0., 15.)),
-                //         NavQuery::Accuracy,
-                //         NavPathMode::Accuracy,
-                //     ),
-                //     nav: Nav::new(100.0),
-                // },
+                HitPoints::new(500_000),
+                NavBundle {
+                    pathfind: Pathfind::new(
+                        navmesh,
+                        CREEP_CLEARANCE,
+                        None,
+                        PathTarget::Static(Vec2::new(0.5 + MAP_WIDTH as f32 - 1., 0.5)),
+                        NavQuery::Accuracy,
+                        NavPathMode::Accuracy,
+                    ),
+                    nav: Nav::new(1.),
+                },
+                CreepPos {
+                    pos: Vec2::new(0.5, 0.5 + MAP_WIDTH as f32 - 1.),
+                },
                 Name::new("Creep"),
             ));
         }

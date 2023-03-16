@@ -1,4 +1,5 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
+use seldom_interop::prelude::Position2;
 
 #[derive(Component)]
 pub struct TrackWorldObjectToScreenPosition {
@@ -124,4 +125,27 @@ pub fn ray_from_screenspace(
 pub fn approx_equal(a: f32, b: f32) -> bool {
     let margin = f32::EPSILON;
     (a - b).abs() < margin
+}
+
+#[derive(Component)]
+pub struct CreepPos {
+    pub pos: Vec2,
+}
+
+impl Position2 for CreepPos {
+    type Position = Vec2;
+
+    fn get(&self) -> Self::Position {
+        self.pos
+    }
+
+    fn set(&mut self, pos: Self::Position) {
+        self.pos = pos;
+    }
+}
+
+pub fn update_creep_position(mut creeps: Query<(&mut Transform, &CreepPos), Changed<CreepPos>>) {
+    for (mut transform, pos) in &mut creeps {
+        transform.translation = dbg!(Vec3::new(pos.pos.x, transform.translation.y, pos.pos.y));
+    }
 }

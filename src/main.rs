@@ -23,7 +23,9 @@ use bevy::{
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_lyon::prelude::*;
 use bevy_rapier3d::prelude::*;
-use common::{Builds, Fadeout, MovingTo, TrackWorldObjectToScreenPosition};
+use common::{
+    update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
+};
 use controls::{build_on_click, show_highlight, update_under_cursor, UnderCursor};
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
@@ -39,7 +41,7 @@ pub const CLEAR: Color = Color::BLACK;
 pub const WINDOW_HEIGHT: f32 = 600.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
-pub const CREEP_CLEARANCE: f32 = 0.25;
+pub const CREEP_CLEARANCE: f32 = 0.;
 
 fn main() {
     App::new()
@@ -67,7 +69,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_plugin(ShapePlugin)
-        .add_plugin(MapNavPlugin::<Transform>::default())
+        .add_plugin(MapNavPlugin::<CreepPos>::default())
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         // Internal plugins
@@ -91,6 +93,7 @@ fn main() {
             Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
             show_highlight.in_set(OnUpdate(Phase::Build)),
             build_on_click.in_set(OnUpdate(Phase::Build)),
+            update_creep_position,
         ))
         .add_systems((
             CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
@@ -114,9 +117,9 @@ fn startup(
     transform.rotate_local_x(-35.264_f32.to_radians());
     // Imperfect camera placement wherever
     transform.translation = Vec3::new(
-        MAP_WIDTH as f32 * 0.7,
+        MAP_WIDTH as f32 * 1.2,
         MAP_WIDTH as f32 * 0.5,
-        MAP_HEIGHT as f32 * 0.7,
+        MAP_HEIGHT as f32 * 1.2,
     );
     let camera = Camera3dBundle {
         transform,
@@ -136,17 +139,18 @@ fn startup(
                 .into(),
             ),
             material: mats.add(Color::DARK_GREEN.into()),
+            transform: Transform::from_xyz(MAP_WIDTH as f32 / 2., 0., MAP_HEIGHT as f32 / 2.),
             ..default()
         },
         Collider::cuboid(MAP_WIDTH as f32 / 2., 0.01, MAP_HEIGHT as f32 / 2.),
+        Navmeshes::generate(
+            [MAP_WIDTH, MAP_HEIGHT].into(),
+            Vec2::new(1., 1.),
+            navability,
+            [CREEP_CLEARANCE],
+        )
+        .unwrap(),
     ));
-    commands.spawn((Navmeshes::generate(
-        [MAP_WIDTH, MAP_HEIGHT].into(),
-        Vec2::new(1., 1.),
-        navability,
-        [CREEP_CLEARANCE],
-    )
-    .unwrap(),));
 
     commands.spawn((CreepSpawner::default(),));
 }
