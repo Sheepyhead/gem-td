@@ -17,16 +17,14 @@
 #![feature(is_some_and)]
 
 use bevy::{
-    prelude::{
-        shape::{Cube, Plane},
-        *,
-    },
+    prelude::{shape::Plane, *},
     window::WindowResolution,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_lyon::prelude::*;
-use common::{Builds, CursorPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition};
-use controls::update_cursor_pos;
+use bevy_rapier3d::prelude::*;
+use common::{Builds, Fadeout, MovingTo, TrackWorldObjectToScreenPosition};
+use controls::{show_highlight, update_under_cursor, UnderCursor};
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
 use towers::BasicTower;
@@ -71,15 +69,16 @@ fn main() {
         .add_plugin(ShapePlugin)
         .add_plugin(MapNavPlugin::<Transform>::default())
         .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         // Internal plugins
         .add_state::<Phase>()
         .add_event::<Damaged>()
         .add_event::<Dead>()
-        .init_resource::<CursorPos>()
         .init_resource::<Builds>()
+        .init_resource::<UnderCursor>()
         .add_startup_system(startup)
         .add_systems((
-            update_cursor_pos,
+            update_under_cursor,
             BasicTower::update,
             Fadeout::fadeout,
             Damaged::consume,
@@ -90,6 +89,7 @@ fn main() {
             HitPoints::spawn_health_bars,
             HitPoints::update_health_bars,
             Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
+            show_highlight,
         ))
         .add_systems((
             CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
@@ -107,9 +107,11 @@ fn startup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<StandardMaterial>>,
 ) {
+    // Perfect isometric rotation
     let mut transform =
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 0., 45_f32.to_radians(), 0.));
     transform.rotate_local_x(-35.264_f32.to_radians());
+    // Imperfect camera placement wherever
     transform.translation = Vec3::new(
         MAP_WIDTH as f32 * 0.7,
         MAP_WIDTH as f32 * 0.5,
@@ -123,23 +125,20 @@ fn startup(
 
     let tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
     let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(
-            Plane {
-                size: MAP_WIDTH as f32,
-                ..default()
-            }
-            .into(),
-        ),
-        material: mats.add(Color::DARK_GREEN.into()),
-        ..default()
-    });
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cube { size: 1.0 }.into()),
-        material: mats.add(Color::PINK.into()),
-        transform: Transform::from_xyz(0., 0.5, 0.),
-        ..default()
-    });
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(
+                Plane {
+                    size: MAP_WIDTH as f32,
+                    ..default()
+                }
+                .into(),
+            ),
+            material: mats.add(Color::DARK_GREEN.into()),
+            ..default()
+        },
+        Collider::cuboid(MAP_WIDTH as f32 / 2., 0.01, MAP_HEIGHT as f32 / 2.),
+    ));
     commands.spawn((Navmeshes::generate(
         [MAP_WIDTH, MAP_HEIGHT].into(),
         Vec2::new(1., 1.),

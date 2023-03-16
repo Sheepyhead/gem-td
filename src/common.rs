@@ -1,32 +1,5 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
 
-// Converts the cursor position into a world position, taking into account any transforms applied
-// the camera.
-pub fn cursor_pos_in_world(
-    window: &Window,
-    cursor_pos: Vec2,
-    cam_t: &Transform,
-    cam: &Camera,
-) -> Vec3 {
-    let window_size = Vec2::new(window.width(), window.height());
-
-    // Convert screen position [0..resolution] to ndc [-1..1]
-    // (ndc = normalized device coordinates)
-    let ndc_to_world = cam_t.compute_matrix() * cam.projection_matrix().inverse();
-    let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
-    ndc_to_world.project_point3(ndc.extend(0.0))
-}
-
-#[derive(Resource)]
-pub struct CursorPos(pub Vec3);
-impl Default for CursorPos {
-    fn default() -> Self {
-        // Initialize the cursor pos at some far away place. It will get updated
-        // correctly when the cursor moves.
-        Self(Vec3::new(-1000.0, -1000.0, 0.0))
-    }
-}
-
 #[derive(Component)]
 pub struct TrackWorldObjectToScreenPosition {
     pub target: Entity,
@@ -114,4 +87,41 @@ impl Builds {
     pub fn reset_system(mut builds: ResMut<Builds>) {
         *builds = Self::default();
     }
+}
+
+pub fn ray_from_screenspace(
+    cursor_pos_screen: Vec2,
+    window: &Window,
+    camera: &Camera,
+    projection: &PerspectiveProjection,
+    camera_transform: &GlobalTransform,
+    length: f32,
+) -> (Vec3, Vec3) {
+    let view = camera_transform.compute_matrix();
+    let screen_size = Vec2::from([window.width(), window.height()]);
+    let projection_matrix = camera.projection_matrix();
+
+    // 2D Normalized device coordinate cursor position from (-1, -1) to (1, 1)
+    let cursor_ndc = (cursor_pos_screen / screen_size) * 2.0 - Vec2::from([1.0, 1.0]);
+    let ndc_to_world: Mat4 = view * projection_matrix.inverse();
+    let world_to_ndc = projection_matrix * view;
+    let is_orthographic = approx_equal(projection_matrix.w_axis[3], 1.0);
+
+    // Compute the cursor position at the near plane. The bevy camera looks at -Z.
+    let ndc_near = world_to_ndc.transform_point3(-Vec3::Z * projection.near).z;
+    let cursor_pos_near = ndc_to_world.transform_point3(cursor_ndc.extend(ndc_near));
+
+    // Compute the ray's direction depending on the projection used.
+    let ray_direction = if is_orthographic {
+        view.transform_vector3(-Vec3::Z)
+    } else {
+        cursor_pos_near - camera_transform.translation()
+    };
+
+    (cursor_pos_near, ray_direction * length)
+}
+
+pub fn approx_equal(a: f32, b: f32) -> bool {
+    let margin = f32::EPSILON;
+    (a - b).abs() < margin
 }

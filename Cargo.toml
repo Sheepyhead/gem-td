@@ -12,6 +12,7 @@ seldom_map_nav = "0.3"
 seldom_interop = "0.3"
 bevy-inspector-egui = "0.18"
 fastrand = "1.9"
+bevy_rapier3d = "0.21"
 
 [profile.dev]
 opt-level = 1

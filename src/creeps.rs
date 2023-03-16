@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::prelude::{shape::Circle, *};
 use seldom_map_nav::prelude::*;
 
 use crate::{
@@ -138,7 +138,8 @@ impl CreepSpawner {
     pub fn spawn(
         mut commands: Commands,
         mut phase: ResMut<NextState<Phase>>,
-        ass: Res<AssetServer>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut mats: ResMut<Assets<StandardMaterial>>,
         time: Res<Time>,
         mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
         creeps: Query<(), With<Creep>>,
@@ -157,8 +158,15 @@ impl CreepSpawner {
             spawns_left += spawner.amount;
             let navmesh = navmeshes.single();
             commands.spawn((
-                SpriteBundle {
-                    texture: ass.load("creep.png"),
+                PbrBundle {
+                    mesh: meshes.add(
+                        Circle {
+                            radius: 0.25,
+                            ..default()
+                        }
+                        .into(),
+                    ),
+                    material: mats.add(Color::BLACK.into()),
                     transform: transform.compute_transform(),
                     ..default()
                 },
