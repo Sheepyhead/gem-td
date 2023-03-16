@@ -24,7 +24,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_lyon::prelude::*;
 use bevy_rapier3d::prelude::*;
 use common::{Builds, Fadeout, MovingTo, TrackWorldObjectToScreenPosition};
-use controls::{show_highlight, update_under_cursor, UnderCursor};
+use controls::{show_highlight, update_under_cursor, UnderCursor, build_on_click};
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
 use towers::BasicTower;
@@ -89,7 +89,8 @@ fn main() {
             HitPoints::spawn_health_bars,
             HitPoints::update_health_bars,
             Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
-            show_highlight,
+            show_highlight.in_set(OnUpdate(Phase::Build)),
+            build_on_click,
         ))
         .add_systems((
             CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
@@ -159,6 +160,6 @@ pub enum Phase {
 
 fn check_state_change(state: Res<State<Phase>>) {
     if state.is_changed() {
-        // println!("State changed to {state:?}");
+        println!("State changed to {state:?}");
     }
 }

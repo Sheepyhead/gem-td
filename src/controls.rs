@@ -1,10 +1,20 @@
+use std::time::Duration;
+
 use bevy::{
+    input::{mouse::MouseButtonInput, ButtonState},
     math::Vec3Swizzles,
-    prelude::{shape::Plane, *},
+    prelude::{
+        shape::{Cube, Plane},
+        *,
+    },
 };
 use bevy_rapier3d::prelude::*;
 
-use crate::common::ray_from_screenspace;
+use crate::{
+    common::{ray_from_screenspace, Builds},
+    towers::{BasicTower, Cooldown, Target},
+    Phase,
+};
 
 pub fn update_under_cursor(
     context: Res<RapierContext>,
@@ -98,6 +108,57 @@ pub fn show_highlight(
         // No tiles under cursor so remove any existing highlights
         for (entity, _) in &existing_highlights {
             commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
+pub fn build_on_click(
+    mut commands: Commands,
+    mut mouse: EventReader<MouseButtonInput>,
+    mut builds: ResMut<Builds>,
+    mut next_phase: ResMut<NextState<Phase>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut mats: ResMut<Assets<StandardMaterial>>,
+    phase: Res<State<Phase>>,
+    cursor_pos: Res<UnderCursor>,
+) {
+    // If there are no more builds and the current phase is Build, change phase
+    if **builds == 0 && phase.0 == Phase::Build {
+        next_phase.set(Phase::Spawn);
+        return;
+    }
+
+    for event in mouse.iter() {
+        if let MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+        } = event
+        {
+            if let Some(cursor_pos) = **cursor_pos {
+                let pos = Vec2::new(cursor_pos.x.ceil(), cursor_pos.y.ceil())
+                    .extend(1.0)
+                    .xzy();
+
+                // Make a cooldown timer that starts in a finished state
+                let time = 1.0;
+                let mut timer = Timer::from_seconds(time, TimerMode::Once);
+                timer.tick(Duration::from_secs_f32(time));
+
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cube { size: 2.0 }.into()),
+                        material: mats.add(
+                            Color::rgb(fastrand::f32(), fastrand::f32(), fastrand::f32()).into(),
+                        ),
+                        transform: Transform::from_translation(pos),
+                        ..default()
+                    },
+                    BasicTower,
+                    Cooldown(timer),
+                    Target(None),
+                ));
+                **builds -= 1;
+            }
         }
     }
 }
