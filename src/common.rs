@@ -1,7 +1,4 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
-use bevy_ecs_tilemap::tiles::TilePos;
-
-use crate::{MAP_HEIGHT, TILE_SIZE};
 
 // Converts the cursor position into a world position, taking into account any transforms applied
 // the camera.
@@ -104,17 +101,6 @@ impl Fadeout {
     }
 }
 
-#[derive(Component)]
-pub struct AvoidZOrderClamping;
-
-pub fn clamp_z_order_to_y(
-    mut transforms: Query<&mut Transform, (Without<AvoidZOrderClamping>, Changed<Transform>)>,
-) {
-    for mut transform in &mut transforms {
-        transform.translation.z = -transform.translation.y;
-    }
-}
-
 #[derive(Deref, DerefMut, Resource)]
 pub struct Builds(pub u32);
 
@@ -128,18 +114,4 @@ impl Builds {
     pub fn reset_system(mut builds: ResMut<Builds>) {
         *builds = Self::default();
     }
-}
-
-pub fn tile_pos_to_square_pos(TilePos { x, y }: TilePos) -> Vec2 {
-    Vec2::new(
-        ((y as f32 + 1.) / 2. + (x as f32 / 2.)) * TILE_SIZE.x,
-        ((y + MAP_HEIGHT) as f32 / 4. - (x as f32 / 4.)) * TILE_SIZE.x,
-    )
-}
-
-pub fn iso_pos_to_square_pos(Vec2 { x, y }: Vec2) -> Vec2 {
-    Vec2::new(
-        (y + TILE_SIZE.x / 2.) + (x / 2.),
-        (y/2. + MAP_HEIGHT as f32 * TILE_SIZE.y / 2.) - (x / 4.),
-    )
 }

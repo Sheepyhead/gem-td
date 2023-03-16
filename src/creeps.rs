@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use seldom_map_nav::prelude::*;
 
 use crate::{
-    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, IsoPosition, Phase,
-    CREEP_CLEARANCE, RESOLUTION, TILE_SIZE, WINDOW_HEIGHT,
+    common::TrackWorldObjectToScreenPosition, progress_bar::ProgressBar, Phase, CREEP_CLEARANCE,
+    RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -138,7 +138,7 @@ impl CreepSpawner {
     pub fn spawn(
         mut commands: Commands,
         mut phase: ResMut<NextState<Phase>>,
-        asset_server: Res<AssetServer>,
+        ass: Res<AssetServer>,
         time: Res<Time>,
         mut spawners: Query<(&GlobalTransform, &mut CreepSpawner)>,
         creeps: Query<(), With<Creep>>,
@@ -158,7 +158,7 @@ impl CreepSpawner {
             let navmesh = navmeshes.single();
             commands.spawn((
                 SpriteBundle {
-                    texture: asset_server.load("creep.png"),
+                    texture: ass.load("creep.png"),
                     transform: transform.compute_transform(),
                     ..default()
                 },
@@ -169,14 +169,11 @@ impl CreepSpawner {
                         navmesh,
                         CREEP_CLEARANCE,
                         None,
-                        PathTarget::Static(Vec2::new(0. * TILE_SIZE.x, 15. * TILE_SIZE.y)),
+                        PathTarget::Static(Vec2::new(0., 15.)),
                         NavQuery::Accuracy,
                         NavPathMode::Accuracy,
                     ),
                     nav: Nav::new(100.0),
-                },
-                IsoPosition {
-                    pos: Vec2::new(TILE_SIZE.x / 2., TILE_SIZE.y / 2.),
                 },
                 Name::new("Creep"),
             ));

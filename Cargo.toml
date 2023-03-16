@@ -7,11 +7,11 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.10"
-bevy_ecs_tilemap = { git = "https://github.com/geieredgar/bevy_ecs_tilemap", branch = "bevy_track"}
 bevy_prototype_lyon = "0.8"
 seldom_map_nav = "0.3"
 seldom_interop = "0.3"
 bevy-inspector-egui = "0.18"
+fastrand = "1.9"
 
 [profile.dev]
 opt-level = 1

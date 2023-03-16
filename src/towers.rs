@@ -1,13 +1,9 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
-use bevy_ecs_tilemap::prelude::*;
 use bevy_prototype_lyon::prelude::*;
-use seldom_map_nav::prelude::{Navability, Navmeshes};
 
 use crate::{
     common::Fadeout,
-    controls::TileOccupied,
     creeps::{Damaged, HitPoints},
-    CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE,
 };
 
 #[derive(Component)]
@@ -88,25 +84,25 @@ impl BasicTower {
 #[derive(Component, Deref, DerefMut)]
 pub struct Cooldown(pub Timer);
 
-pub fn rebuild_navmesh(
-    mut commands: Commands,
-    navmeshes: Query<Entity, With<Navmeshes>>,
-    occupied_tiles: Query<&TilePos, With<TileOccupied>>,
-) {
-    let map = navmeshes.single();
-    let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
-    for pos in &occupied_tiles {
-        // println!("Occupied {:?} ({:?})", pos, pos.center_in_world(size, typ));
-        tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
-    }
-    let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
-    commands.entity(map).insert(
-        Navmeshes::generate(
-            [MAP_WIDTH, MAP_HEIGHT].into(),
-            TILE_SIZE,
-            navability,
-            [CREEP_CLEARANCE],
-        )
-        .unwrap(),
-    );
-}
+// FIXME:
+// pub fn rebuild_navmesh(
+//     mut commands: Commands,
+//     navmeshes: Query<Entity, With<Navmeshes>>,
+//     occupied_tiles: Query<&Transform, With<TileOccupied>>,
+// ) {
+//     let map = navmeshes.single();
+//     let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
+//     for pos in &occupied_tiles {
+//         tilemap[(pos.translation.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
+//     }
+//     let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
+//     commands.entity(map).insert(
+//         Navmeshes::generate(
+//             [MAP_WIDTH, MAP_HEIGHT].into(),
+//             Vec2::new(1., 1.),
+//             navability,
+//             [CREEP_CLEARANCE],
+//         )
+//         .unwrap(),
+//     );
+// }
