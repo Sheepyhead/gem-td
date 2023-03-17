@@ -137,7 +137,7 @@ pub fn rebuild_navmesh(
 ) {
     let map = navmeshes.single();
     let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
-    for pos in dbg!(build_grid).iter() {
+    for pos in build_grid.iter() {
         tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
     }
     let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];

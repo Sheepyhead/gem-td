@@ -117,6 +117,7 @@ fn startup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<StandardMaterial>>,
+    mut build_grid: ResMut<BuildGrid>,
 ) {
     // Perfect isometric rotation
     let mut transform =
@@ -160,6 +161,15 @@ fn startup(
     ));
 
     commands.spawn((CreepSpawner::default(),));
+
+    build_grid.insert(UVec2::new(0, 15));
+    build_grid.insert(UVec2::new(0, 14));
+    build_grid.insert(UVec2::new(1, 14));
+    build_grid.insert(UVec2::new(1, 15));
+    build_grid.insert(UVec2::new(15, 0));
+    build_grid.insert(UVec2::new(14, 0));
+    build_grid.insert(UVec2::new(14, 1));
+    build_grid.insert(UVec2::new(15, 1));
 }
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, States)]
