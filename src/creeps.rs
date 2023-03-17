@@ -4,7 +4,7 @@ use seldom_map_nav::prelude::*;
 use crate::{
     common::{CreepPos, TrackWorldObjectToScreenPosition},
     progress_bar::ProgressBar,
-    Phase, CREEP_CLEARANCE, MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
+    CurrentLevel, Phase, CREEP_CLEARANCE, MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
@@ -93,6 +93,54 @@ impl HitPoints {
             }
         }
     }
+
+    #[allow(clippy::match_same_arms)]
+    pub fn from_level(level: u32) -> Self {
+        Self::new(match level {
+            1 => 10,
+            2 => 30,
+            3 => 55,
+            4 => 70,
+            5 => 90,
+            6 => 120,
+            7 => 178,
+            8 => 240,
+            9 => 300,
+            10 => 470,
+            11 => 490,
+            12 => 450,
+            13 => 570,
+            14 => 650,
+            15 => 1_000,
+            16 => 725,
+            17 => 1_350,
+            18 => 1_550,
+            19 => 1_950,
+            20 => 1_350,
+            21 => 2_300,
+            22 => 2_530,
+            23 => 3_000,
+            24 => 2_500,
+            25 => 3_750,
+            26 => 4_500,
+            27 => 5_000,
+            28 => 4_150,
+            29 => 6_750,
+            30 => 7_150,
+            31 => 8_000,
+            32 => 6_200,
+            33 => 9_550,
+            34 => 10_200,
+            35 => 11_500,
+            36 => 8_500,
+            37 => 13_000,
+            38 => 15_000,
+            39 => 17_000,
+            40 => 10_500,
+            41 => 19_500,
+            _ => 23_000,
+        })
+    }
 }
 
 #[derive(Component)]
@@ -142,6 +190,7 @@ impl CreepSpawner {
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         time: Res<Time>,
+        level: Res<CurrentLevel>,
         mut spawners: Query<&mut CreepSpawner>,
         creeps: Query<(), With<Creep>>,
         navmeshes: Query<Entity, With<Navmeshes>>,
@@ -166,7 +215,7 @@ impl CreepSpawner {
                     ..default()
                 },
                 Creep,
-                HitPoints::new(15),
+                HitPoints::from_level(**level),
                 NavBundle {
                     pathfind: Pathfind::new(
                         navmesh,

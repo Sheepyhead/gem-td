@@ -80,6 +80,7 @@ fn main() {
         .add_event::<Damaged>()
         .add_event::<Dead>()
         .init_resource::<Builds>()
+        .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
         .init_resource::<BuildGrid>()
         .add_startup_system(startup)
@@ -106,6 +107,7 @@ fn main() {
             uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
             remove_highlight.in_schedule(OnExit(Phase::Build)),
             pick_building.in_set(OnUpdate(Phase::Pick)),
+            next_level.in_schedule(OnExit(Phase::Spawn)),
         ))
         .run();
 }
@@ -184,4 +186,17 @@ fn check_state_change(state: Res<State<Phase>>) {
     if state.is_changed() {
         println!("State changed to {state:?}");
     }
+}
+
+#[derive(Resource, Clone, Copy, Deref, DerefMut)]
+pub struct CurrentLevel(u32);
+
+impl Default for CurrentLevel {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+pub fn next_level(mut level: ResMut<CurrentLevel>) {
+    **level += 1;
 }

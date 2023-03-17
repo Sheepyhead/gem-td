@@ -231,12 +231,15 @@ pub fn pick_building(
                             commands.entity(entity).remove::<Dirt>();
                         } else {
                             commands.entity(entity).despawn();
-                            commands.spawn(PbrBundle {
-                                mesh: meshes.add(Cube { size: 2.0 }.into()),
-                                material: mats.add(Color::ORANGE_RED.into()),
-                                transform: transform.compute_transform(),
-                                ..default()
-                            });
+                            commands.spawn((
+                                PbrBundle {
+                                    mesh: meshes.add(Cube { size: 2.0 }.into()),
+                                    material: mats.add(Color::ORANGE_RED.into()),
+                                    transform: transform.compute_transform(),
+                                    ..default()
+                                },
+                                Name::new("Dirt"),
+                            ));
                         }
                     }
                     next_phase.set(Phase::Spawn);

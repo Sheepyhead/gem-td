@@ -1,4 +1,8 @@
-use std::{fmt::Debug, ops::RangeInclusive, time::Duration};
+use std::{
+    fmt::{Debug, Display},
+    ops::RangeInclusive,
+    time::Duration,
+};
 
 use bevy::{
     prelude::{shape::Cube, *},
@@ -68,6 +72,7 @@ pub fn uncover_dirt(
             meshes.add(Into::<Cube>::into(gem_tower).into()),
             mats.add(gem_tower.typ.into()),
             gem_tower,
+            Name::new(gem_tower.to_string()),
             Tower,
             LaserAttack::from(gem_tower),
             Cooldown(timer),
@@ -174,6 +179,32 @@ impl GemType {
 pub struct GemTower {
     typ: GemType,
     quality: GemQuality,
+}
+
+impl Display for GemTower {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}",
+            match self.quality {
+                GemQuality::Chipped => "Chipped ",
+                GemQuality::Flawed => "Flawed ",
+                GemQuality::Normal => "",
+                GemQuality::Flawless => "Flawless ",
+                GemQuality::Perfect => "Perfect ",
+            },
+            match self.typ {
+                GemType::Emerald => "Emerald",
+                GemType::Ruby => "Ruby",
+                GemType::Sapphire => "Sapphire",
+                GemType::Diamond => "Diamond",
+                GemType::Amethyst => "Amethyst",
+                GemType::Opal => "Opal",
+                GemType::Aquamarine => "Aquamarine",
+                GemType::Topaz => "Topaz",
+            }
+        )
+    }
 }
 
 impl From<GemTower> for LaserAttack {
