@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     math::Vec3Swizzles,
@@ -10,12 +8,11 @@ use bevy::{
     utils::HashSet,
 };
 use bevy_rapier3d::prelude::*;
-use seldom_map_nav::prelude::*;
 
 use crate::{
     common::{ray_from_screenspace, Builds},
-    towers::{BasicTower, BuildGrid, Cooldown, Target},
-    Phase, CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
+    towers::{BuildGrid, Dirt},
+    Phase,
 };
 
 pub fn update_under_cursor(
@@ -128,6 +125,12 @@ pub fn show_highlight(
     }
 }
 
+pub fn remove_highlight(mut commands: Commands, highlight: Query<Entity, With<TileHighlight>>) {
+    for entity in &highlight {
+        commands.entity(entity).despawn_recursive();
+    }
+}
+
 fn get_squares_from_pos(position: Vec2) -> [Vec2; 4] {
     let top_corner_position = Vec2::new(position.x.ceil() - 0.5, position.y.ceil() - 0.5);
     [
@@ -151,7 +154,7 @@ pub fn build_on_click(
 ) {
     // If there are no more builds and the current phase is Build, change phase
     if **builds == 0 && phase.0 == Phase::Build {
-        next_phase.set(Phase::Spawn);
+        next_phase.set(Phase::Pick);
         return;
     }
 
@@ -179,10 +182,6 @@ pub fn build_on_click(
                 for pos in &positions {
                     build_grid.insert(*pos);
                 }
-                // Make a cooldown timer that starts in a finished state
-                let time = 1.0;
-                let mut timer = Timer::from_seconds(time, TimerMode::Once);
-                timer.tick(Duration::from_secs_f32(time));
 
                 let mut color: StandardMaterial =
                     Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
@@ -190,13 +189,11 @@ pub fn build_on_click(
                 commands.spawn((
                     PbrBundle {
                         mesh: meshes.add(Cube { size: 2.0 }.into()),
-                        material: mats.add(color),
+                        material: mats.add(Color::ORANGE_RED.into()),
                         transform: Transform::from_translation(pos),
                         ..default()
                     },
-                    BasicTower,
-                    Cooldown(timer),
-                    Target(None),
+                    Dirt,
                 ));
 
                 **builds -= 1;
@@ -205,24 +202,47 @@ pub fn build_on_click(
     }
 }
 
-pub fn rebuild_navmesh(
+pub fn pick_building(
     mut commands: Commands,
-    build_grid: Res<BuildGrid>,
-    navmeshes: Query<Entity, With<Navmeshes>>,
+    mut mouse: EventReader<MouseButtonInput>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut mats: ResMut<Assets<StandardMaterial>>,
+    mut next_phase: ResMut<NextState<Phase>>,
+    cursor_pos: Res<UnderCursor>,
+    dirt: Query<(Entity, &GlobalTransform), With<Dirt>>,
 ) {
-    let map = navmeshes.single();
-    let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
-    for pos in dbg!(build_grid).iter() {
-        tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
+    for event in mouse.iter() {
+        if let MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+        } = event
+        {
+            if let Some(cursor_pos) = **cursor_pos {
+                let mut picked_tower = None;
+                for (entity, transform) in &dirt {
+                    if transform.translation().xz().distance(cursor_pos) <= 1.0 {
+                        println!("Picked tower {entity:?}");
+                        picked_tower = Some(entity);
+                    }
+                }
+
+                if let Some(picked_tower) = picked_tower {
+                    for (entity, transform) in &dirt {
+                        if entity == picked_tower {
+                            commands.entity(entity).remove::<Dirt>();
+                        } else {
+                            commands.entity(entity).despawn();
+                            commands.spawn(PbrBundle {
+                                mesh: meshes.add(Cube { size: 2.0 }.into()),
+                                material: mats.add(Color::ORANGE_RED.into()),
+                                transform: transform.compute_transform(),
+                                ..default()
+                            });
+                        }
+                    }
+                    next_phase.set(Phase::Spawn);
+                }
+            }
+        }
     }
-    let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
-    commands.entity(map).insert(
-        Navmeshes::generate(
-            [MAP_WIDTH, MAP_HEIGHT].into(),
-            Vec2::new(1., 1.),
-            navability,
-            [CREEP_CLEARANCE],
-        )
-        .unwrap(),
-    );
 }

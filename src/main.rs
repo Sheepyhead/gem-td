@@ -26,10 +26,13 @@ use bevy_rapier3d::prelude::*;
 use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
 };
-use controls::{build_on_click, rebuild_navmesh, show_highlight, update_under_cursor, UnderCursor};
+use controls::{
+    build_on_click, pick_building, remove_highlight, show_highlight, update_under_cursor,
+    UnderCursor,
+};
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
-use towers::{BasicTower, BuildGrid};
+use towers::{rebuild_navmesh, uncover_dirt, BasicTower, BuildGrid};
 
 mod common;
 mod controls;
@@ -99,7 +102,10 @@ fn main() {
         .add_systems((
             CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
             check_state_change,
-            rebuild_navmesh.in_schedule(OnExit(Phase::Build)),
+            rebuild_navmesh.in_schedule(OnExit(Phase::Pick)),
+            uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
+            remove_highlight.in_schedule(OnExit(Phase::Build)),
+            pick_building.in_set(OnUpdate(Phase::Pick)),
         ))
         .run();
 }
@@ -160,6 +166,7 @@ fn startup(
 pub enum Phase {
     #[default]
     Build,
+    Pick,
     Spawn,
 }
 

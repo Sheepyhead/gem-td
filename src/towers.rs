@@ -1,15 +1,19 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 use bevy::{prelude::*, utils::HashSet};
 use bevy_prototype_debug_lines::DebugLines;
+use seldom_map_nav::prelude::*;
 
 use crate::{
     creeps::{Damaged, HitPoints},
-    MAP_HEIGHT, MAP_WIDTH,
+    CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
 #[derive(Component)]
 pub struct BasicTower;
+
+#[derive(Component)]
+pub struct Dirt;
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Target(pub Option<Entity>);
@@ -100,4 +104,50 @@ impl Debug for BuildGrid {
         }
         write!(f, "{}", &text)
     }
+}
+
+pub fn uncover_dirt(
+    mut commands: Commands,
+    mut mats: ResMut<Assets<StandardMaterial>>,
+    dirt: Query<Entity, With<Dirt>>,
+) {
+    for entity in &dirt {
+        let mut color: StandardMaterial =
+            Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
+        color.alpha_mode = AlphaMode::Add;
+
+        // Make a cooldown timer that starts in a finished state
+        let time = 1.0;
+        let mut timer = Timer::from_seconds(time, TimerMode::Once);
+        timer.tick(Duration::from_secs_f32(time));
+
+        commands.entity(entity).insert((
+            mats.add(color),
+            BasicTower,
+            Cooldown(timer),
+            Target(None),
+        ));
+    }
+}
+
+pub fn rebuild_navmesh(
+    mut commands: Commands,
+    build_grid: Res<BuildGrid>,
+    navmeshes: Query<Entity, With<Navmeshes>>,
+) {
+    let map = navmeshes.single();
+    let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
+    for pos in dbg!(build_grid).iter() {
+        tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
+    }
+    let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
+    commands.entity(map).insert(
+        Navmeshes::generate(
+            [MAP_WIDTH, MAP_HEIGHT].into(),
+            Vec2::new(1., 1.),
+            navability,
+            [CREEP_CLEARANCE],
+        )
+        .unwrap(),
+    );
 }
