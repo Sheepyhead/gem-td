@@ -133,7 +133,7 @@ pub fn uncover_dirt(
         let mut timer = Timer::from_seconds(time, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(time));
 
-        let typ = GemType::Emerald;
+        let typ = GemType::random();
 
         commands.entity(entity).insert((
             mats.add(typ.into()),
@@ -170,6 +170,12 @@ pub fn rebuild_navmesh(
 #[derive(Component, Clone, Copy)]
 pub enum GemType {
     Emerald,
+    Ruby,
+    Sapphire,
+    Diamond,
+    Amethyst,
+    Opal,
+    Aquamarine,
 }
 
 impl From<GemType> for StandardMaterial {
@@ -184,6 +190,27 @@ impl From<GemType> for Color {
     fn from(value: GemType) -> Self {
         match value {
             GemType::Emerald => Color::GREEN,
+            GemType::Ruby => Color::RED,
+            GemType::Sapphire => Color::BLUE,
+            GemType::Diamond => Color::WHITE,
+            GemType::Amethyst => Color::PURPLE,
+            GemType::Opal => Color::FUCHSIA,
+            GemType::Aquamarine => Color::SEA_GREEN,
+        }
+    }
+}
+
+impl GemType {
+    fn random() -> Self {
+        match fastrand::u8(0..7) {
+            0 => GemType::Emerald,
+            1 => GemType::Ruby,
+            2 => GemType::Sapphire,
+            3 => GemType::Diamond,
+            4 => GemType::Amethyst,
+            5 => GemType::Opal,
+            6 => GemType::Aquamarine,
+            _ => panic!("Gem type larger than 6, this cannot happen"),
         }
     }
 }
