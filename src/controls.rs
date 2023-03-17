@@ -7,6 +7,7 @@ use bevy::{
         shape::{Cube, Plane},
         *,
     },
+    utils::HashSet,
 };
 use bevy_rapier3d::prelude::*;
 use seldom_map_nav::prelude::*;
@@ -60,8 +61,12 @@ pub fn show_highlight(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<StandardMaterial>>,
-    mut existing_highlights: Query<(Entity, &mut Transform), With<TileHighlight>>,
     under_cursor: Res<UnderCursor>,
+    build_grid: Res<BuildGrid>,
+    mut existing_highlights: Query<
+        (Entity, &mut Handle<StandardMaterial>, &mut Transform),
+        With<TileHighlight>,
+    >,
 ) {
     if !under_cursor.is_changed() {
         return;
@@ -70,14 +75,26 @@ pub fn show_highlight(
     if let Some(position) = **under_cursor {
         let mut moved_existing = false;
         let positions = get_squares_from_pos(position);
-        for (index, (_, mut transform)) in (&mut existing_highlights).into_iter().enumerate() {
+        for (index, (_, mut mat, mut transform)) in
+            (&mut existing_highlights).into_iter().enumerate()
+        {
             moved_existing = true;
-            *transform =
-                Transform::from_translation(positions[index].extend(transform.translation.y).xzy());
+            let pos = positions[index];
+            *transform = Transform::from_translation(pos.extend(transform.translation.y).xzy());
+            *mat = mats.add(
+                #[allow(clippy::cast_sign_loss)]
+                if build_grid.contains(&UVec2::new(pos.x as u32, pos.y as u32)) {
+                    Color::RED
+                } else {
+                    Color::YELLOW
+                }
+                .into(),
+            );
         }
 
         if !moved_existing {
             (0..4).for_each(|index| {
+                let pos = positions[index];
                 commands.spawn((
                     PbrBundle {
                         mesh: meshes.add(
@@ -87,12 +104,16 @@ pub fn show_highlight(
                             }
                             .into(),
                         ),
-                        material: mats.add(Color::PINK.into()),
-                        transform: Transform::from_xyz(
-                            positions[index].x,
-                            0.001,
-                            positions[index].y,
+                        material: mats.add(
+                            #[allow(clippy::cast_sign_loss)]
+                            if build_grid.contains(&UVec2::new(pos.x as u32, pos.y as u32)) {
+                                Color::RED
+                            } else {
+                                Color::YELLOW
+                            }
+                            .into(),
                         ),
+                        transform: Transform::from_xyz(pos.x, 0.001, pos.y),
                         ..default()
                     },
                     TileHighlight,
@@ -101,7 +122,7 @@ pub fn show_highlight(
         }
     } else {
         // No tiles under cursor so remove any existing highlights
-        for (entity, _) in &existing_highlights {
+        for (entity, _, _) in &existing_highlights {
             commands.entity(entity).despawn_recursive();
         }
     }
@@ -144,7 +165,20 @@ pub fn build_on_click(
                 let pos = Vec2::new(cursor_pos.x.ceil(), cursor_pos.y.ceil())
                     .extend(1.0)
                     .xzy();
-
+                #[allow(clippy::cast_sign_loss)]
+                let positions = get_squares_from_pos(pos.xz())
+                    .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
+                if build_grid
+                    .intersection(&positions.iter().copied().collect::<HashSet<_>>())
+                    .count()
+                    > 0
+                {
+                    // Attempted to build on occupied square
+                    continue;
+                }
+                for pos in &positions {
+                    build_grid.insert(*pos);
+                }
                 // Make a cooldown timer that starts in a finished state
                 let time = 1.0;
                 let mut timer = Timer::from_seconds(time, TimerMode::Once);
@@ -164,12 +198,7 @@ pub fn build_on_click(
                     Cooldown(timer),
                     Target(None),
                 ));
-                #[allow(clippy::cast_sign_loss)]
-                let positions = get_squares_from_pos(pos.xz())
-                    .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
-                for pos in &positions {
-                    build_grid.insert(*pos);
-                }
+
                 **builds -= 1;
             }
         }
