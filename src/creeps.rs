@@ -4,11 +4,14 @@ use seldom_map_nav::prelude::*;
 use crate::{
     common::{CreepPos, TrackWorldObjectToScreenPosition},
     progress_bar::ProgressBar,
+    towers::Hits,
     CurrentLevel, Phase, CREEP_CLEARANCE, MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
 };
 
 #[derive(Component)]
-pub struct Creep;
+pub struct Creep {
+    pub typ: CreepType,
+}
 
 pub struct Damaged {
     pub target: Entity,
@@ -207,14 +210,22 @@ impl CreepSpawner {
             spawner.amount = spawner.amount.saturating_sub(1);
             spawns_left += spawner.amount;
             let navmesh = navmeshes.single();
+            let typ = CreepType::from_level(**level);
             commands.spawn((
                 PbrBundle {
                     mesh: meshes.add(Cube { size: 0.5 }.into()),
                     material: mats.add(Color::BLACK.into()),
-                    transform: Transform::from_xyz(0.5, 0.25, MAP_WIDTH as f32 - 1.),
+                    transform: Transform::from_xyz(
+                        0.5,
+                        match typ {
+                            CreepType::Ground => 0.25,
+                            CreepType::Flying => 1.25,
+                        },
+                        MAP_WIDTH as f32 - 1.,
+                    ),
                     ..default()
                 },
-                Creep,
+                Creep { typ },
                 HitPoints::from_level(**level),
                 NavBundle {
                     pathfind: Pathfind::new(
@@ -241,6 +252,30 @@ impl CreepSpawner {
     pub fn reset_amount_system(mut spawners: Query<&mut CreepSpawner>) {
         for mut spawner in &mut spawners {
             spawner.amount = CreepSpawner::default().amount;
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum CreepType {
+    Ground,
+    Flying,
+}
+
+impl CreepType {
+    pub fn from_level(level: u32) -> Self {
+        if level % 4 == 0 {
+            CreepType::Flying
+        } else {
+            CreepType::Ground
+        }
+    }
+
+    pub fn hits(self, hits: Hits) -> bool {
+        match hits {
+            Hits::Ground => matches!(self, CreepType::Ground),
+            Hits::Flying => matches!(self, CreepType::Flying),
+            Hits::All => true,
         }
     }
 }

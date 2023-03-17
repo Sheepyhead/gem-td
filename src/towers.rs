@@ -12,7 +12,7 @@ use bevy_prototype_debug_lines::DebugLines;
 use seldom_map_nav::prelude::*;
 
 use crate::{
-    creeps::{Damaged, HitPoints},
+    creeps::{Creep, CreepType, Damaged, HitPoints},
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
@@ -288,6 +288,11 @@ impl From<GemTower> for LaserAttack {
                 (GemType::Topaz, GemQuality::Flawless) => Damage::Fixed(25),
                 (GemType::Topaz, GemQuality::Perfect) => Damage::Fixed(75),
             },
+            hits: match value.typ {
+                GemType::Ruby => Hits::Ground,
+                GemType::Amethyst => Hits::Flying,
+                _ => Hits::All,
+            },
         }
     }
 }
@@ -306,11 +311,19 @@ impl From<GemTower> for shape::Cube {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum Hits {
+    Ground,
+    Flying,
+    All,
+}
+
 #[derive(Component)]
 pub struct LaserAttack {
     range: f32,
     color: Color,
     damage: Damage,
+    hits: Hits,
 }
 
 impl LaserAttack {
@@ -322,14 +335,14 @@ impl LaserAttack {
             (&mut Cooldown, &mut Target, &GlobalTransform, &LaserAttack),
             With<Tower>,
         >,
-        positions: Query<(Entity, &Transform), With<HitPoints>>,
+        positions: Query<(Entity, &Transform, &Creep), With<HitPoints>>,
     ) {
         for (mut cooldown, mut target, tower_pos, attack) in &mut towers {
             cooldown.tick(time.delta());
             if cooldown.finished() {
                 if let Some(target_entity) = **target {
                     // Tower has a target
-                    if let Ok((_, target_pos)) = positions.get(target_entity) {
+                    if let Ok((_, target_pos, _)) = positions.get(target_entity) {
                         // Target is alive
                         cooldown.reset();
                         lines.line_colored(
@@ -350,14 +363,14 @@ impl LaserAttack {
                 } else {
                     // Tower needs to find a new target
                     let closest = Self::get_closest_creep(
-                        positions
-                            .iter()
-                            .map(|(entity, position)| (entity, position.translation)),
+                        positions.iter().map(|(entity, position, Creep { typ })| {
+                            (entity, position.translation, *typ)
+                        }),
                         tower_pos.translation(),
                     );
 
-                    if let Some((creep, distance)) = closest {
-                        if attack.range.powf(2.) >= distance {
+                    if let Some((creep, distance, typ)) = closest {
+                        if attack.range.powf(2.) >= distance && typ.hits(attack.hits) {
                             **target = Some(creep);
                         }
                     }
@@ -367,15 +380,15 @@ impl LaserAttack {
     }
 
     fn get_closest_creep(
-        creeps: impl Iterator<Item = (Entity, Vec3)>,
+        creeps: impl Iterator<Item = (Entity, Vec3, CreepType)>,
         position: Vec3,
-    ) -> Option<(Entity, f32)> {
+    ) -> Option<(Entity, f32, CreepType)> {
         let mut closest = None;
         let mut closest_distance_squared = f32::MAX;
-        for (creep, creep_pos) in creeps {
+        for (creep, creep_pos, typ) in creeps {
             let distance_squared = creep_pos.distance_squared(position);
             if distance_squared < closest_distance_squared {
-                closest = Some((creep, distance_squared));
+                closest = Some((creep, distance_squared, typ));
                 closest_distance_squared = distance_squared;
             }
         }
