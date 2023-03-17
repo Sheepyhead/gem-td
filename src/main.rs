@@ -21,7 +21,7 @@ use bevy::{
     window::WindowResolution,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_prototype_lyon::prelude::*;
+use bevy_prototype_debug_lines::DebugLinesPlugin;
 use bevy_rapier3d::prelude::*;
 use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
@@ -68,7 +68,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugin(ShapePlugin)
+        .add_plugin(DebugLinesPlugin::with_depth_test(true))
         .add_plugin(MapNavPlugin::<CreepPos>::default())
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())

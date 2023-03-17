@@ -130,7 +130,7 @@ impl Default for CreepSpawner {
     fn default() -> Self {
         Self {
             timer: Timer::from_seconds(0.3, TimerMode::Repeating),
-            amount: 10,
+            amount: 20,
         }
     }
 }
@@ -166,7 +166,7 @@ impl CreepSpawner {
                     ..default()
                 },
                 Creep,
-                HitPoints::new(500_000),
+                HitPoints::new(100),
                 NavBundle {
                     pathfind: Pathfind::new(
                         navmesh,

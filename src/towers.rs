@@ -1,10 +1,9 @@
 use std::fmt::Debug;
 
-use bevy::{math::Vec3Swizzles, prelude::*, utils::HashSet};
-use bevy_prototype_lyon::prelude::*;
+use bevy::{prelude::*, utils::HashSet};
+use bevy_prototype_debug_lines::DebugLines;
 
 use crate::{
-    common::Fadeout,
     creeps::{Damaged, HitPoints},
     MAP_HEIGHT, MAP_WIDTH,
 };
@@ -17,7 +16,7 @@ pub struct Target(pub Option<Entity>);
 
 impl BasicTower {
     pub fn update(
-        mut commands: Commands,
+        mut lines: ResMut<DebugLines>,
         time: Res<Time>,
         mut writer: EventWriter<Damaged>,
         mut towers: Query<(&mut Cooldown, &mut Target, &GlobalTransform), With<BasicTower>>,
@@ -31,17 +30,13 @@ impl BasicTower {
                     if let Ok((_, target_pos)) = positions.get(target_entity) {
                         // Target is alive
                         cooldown.reset();
-                        let beam =
-                            shapes::Line(tower_pos.translation().xy(), target_pos.translation.xy());
-                        commands.spawn((
-                            ShapeBundle {
-                                path: GeometryBuilder::build_as(&beam),
-                                transform: Transform::from_xyz(0.0, 0.0, 100.0),
-                                ..default()
-                            },
-                            Stroke::new(Color::RED, 3.0),
-                            Fadeout(Timer::from_seconds(0.25, TimerMode::Once)),
-                        ));
+                        lines.line_colored(
+                            tower_pos.translation(),
+                            target_pos.translation,
+                            0.25,
+                            Color::RED,
+                        );
+
                         writer.send(Damaged {
                             target: target_entity,
                             value: 50,

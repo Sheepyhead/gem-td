@@ -150,12 +150,13 @@ pub fn build_on_click(
                 let mut timer = Timer::from_seconds(time, TimerMode::Once);
                 timer.tick(Duration::from_secs_f32(time));
 
+                let mut color: StandardMaterial =
+                    Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
+                color.alpha_mode = AlphaMode::Add;
                 commands.spawn((
                     PbrBundle {
                         mesh: meshes.add(Cube { size: 2.0 }.into()),
-                        material: mats.add(
-                            Color::rgb(fastrand::f32(), fastrand::f32(), fastrand::f32()).into(),
-                        ),
+                        material: mats.add(color),
                         transform: Transform::from_translation(pos),
                         ..default()
                     },
