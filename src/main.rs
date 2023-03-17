@@ -32,7 +32,7 @@ use controls::{
 };
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
-use towers::{rebuild_navmesh, uncover_dirt, BasicTower, BuildGrid};
+use towers::{rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack};
 
 mod common;
 mod controls;
@@ -85,7 +85,7 @@ fn main() {
         .add_startup_system(startup)
         .add_systems((
             update_under_cursor,
-            BasicTower::update,
+            LaserAttack::attack,
             Fadeout::fadeout,
             Damaged::consume,
             TrackWorldObjectToScreenPosition::track,

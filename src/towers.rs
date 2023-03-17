@@ -10,90 +10,13 @@ use crate::{
 };
 
 #[derive(Component)]
-pub struct BasicTower;
+pub struct Tower;
 
 #[derive(Component)]
 pub struct Dirt;
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Target(pub Option<Entity>);
-
-impl BasicTower {
-    pub fn update(
-        mut lines: ResMut<DebugLines>,
-        time: Res<Time>,
-        mut writer: EventWriter<Damaged>,
-        mut towers: Query<
-            (
-                &mut Cooldown,
-                &mut Target,
-                &GlobalTransform,
-                Option<&GemType>,
-            ),
-            With<BasicTower>,
-        >,
-        positions: Query<(Entity, &Transform), With<HitPoints>>,
-    ) {
-        for (mut cooldown, mut target, tower_pos, typ) in &mut towers {
-            cooldown.tick(time.delta());
-            if cooldown.finished() {
-                if let Some(target_entity) = **target {
-                    // Tower has a target
-                    if let Ok((_, target_pos)) = positions.get(target_entity) {
-                        // Target is alive
-                        cooldown.reset();
-                        lines.line_colored(
-                            tower_pos.translation(),
-                            target_pos.translation,
-                            0.25,
-                            if let Some(typ) = typ {
-                                (*typ).into()
-                            } else {
-                                Color::RED
-                            },
-                        );
-
-                        writer.send(Damaged {
-                            target: target_entity,
-                            value: 50,
-                        });
-                    } else {
-                        // Target is dead
-                        **target = None;
-                    }
-                } else {
-                    // Tower needs to find a new target
-                    let closest = Self::get_closest_creep(
-                        positions
-                            .iter()
-                            .map(|(entity, position)| (entity, position.translation)),
-                        tower_pos.translation(),
-                    );
-
-                    if let Some((creep, _)) = closest {
-                        **target = Some(creep);
-                    }
-                }
-            }
-        }
-    }
-
-    fn get_closest_creep(
-        creeps: impl Iterator<Item = (Entity, Vec3)>,
-        position: Vec3,
-    ) -> Option<(Entity, Vec3)> {
-        let mut closest = None;
-        let mut closest_distance_squared = f32::MAX;
-        for (creep, creep_pos) in creeps {
-            let distance_squared = creep_pos.distance_squared(position);
-            if distance_squared < closest_distance_squared {
-                closest = Some((creep, creep_pos));
-                closest_distance_squared = distance_squared;
-            }
-        }
-        closest
-    }
-}
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Cooldown(pub Timer);
@@ -135,10 +58,15 @@ pub fn uncover_dirt(
 
         let typ = GemType::random();
 
+        let gem_tower = GemTower { typ };
         commands.entity(entity).insert((
             mats.add(typ.into()),
-            typ,
-            BasicTower,
+            gem_tower,
+            Tower,
+            LaserAttack {
+                range: gem_tower.range(),
+                color: typ.into(),
+            },
             Cooldown(timer),
             Target(None),
         ));
@@ -167,7 +95,7 @@ pub fn rebuild_navmesh(
     );
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum GemType {
     Emerald,
     Ruby,
@@ -176,6 +104,7 @@ pub enum GemType {
     Amethyst,
     Opal,
     Aquamarine,
+    Topaz,
 }
 
 impl From<GemType> for StandardMaterial {
@@ -196,13 +125,14 @@ impl From<GemType> for Color {
             GemType::Amethyst => Color::PURPLE,
             GemType::Opal => Color::FUCHSIA,
             GemType::Aquamarine => Color::SEA_GREEN,
+            GemType::Topaz => Color::YELLOW,
         }
     }
 }
 
 impl GemType {
-    fn random() -> Self {
-        match fastrand::u8(0..7) {
+    pub fn random() -> Self {
+        match fastrand::u8(0..8) {
             0 => GemType::Emerald,
             1 => GemType::Ruby,
             2 => GemType::Sapphire,
@@ -210,7 +140,103 @@ impl GemType {
             4 => GemType::Amethyst,
             5 => GemType::Opal,
             6 => GemType::Aquamarine,
+            7 => GemType::Topaz,
             _ => panic!("Gem type larger than 6, this cannot happen"),
         }
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+pub struct GemTower {
+    typ: GemType,
+}
+
+impl GemTower {
+    pub fn range(self) -> f32 {
+        match self.typ {
+            GemType::Ruby
+            | GemType::Emerald
+            | GemType::Diamond
+            | GemType::Amethyst
+            | GemType::Opal => 5.,
+            GemType::Sapphire | GemType::Topaz => 6.,
+            GemType::Aquamarine => 4.,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct LaserAttack {
+    range: f32,
+    color: Color,
+}
+
+impl LaserAttack {
+    pub fn attack(
+        mut lines: ResMut<DebugLines>,
+        time: Res<Time>,
+        mut writer: EventWriter<Damaged>,
+        mut towers: Query<
+            (&mut Cooldown, &mut Target, &GlobalTransform, &LaserAttack),
+            With<Tower>,
+        >,
+        positions: Query<(Entity, &Transform), With<HitPoints>>,
+    ) {
+        for (mut cooldown, mut target, tower_pos, attack) in &mut towers {
+            cooldown.tick(time.delta());
+            if cooldown.finished() {
+                if let Some(target_entity) = **target {
+                    // Tower has a target
+                    if let Ok((_, target_pos)) = positions.get(target_entity) {
+                        // Target is alive
+                        cooldown.reset();
+                        lines.line_colored(
+                            tower_pos.translation(),
+                            target_pos.translation,
+                            0.25,
+                            attack.color,
+                        );
+
+                        writer.send(Damaged {
+                            target: target_entity,
+                            value: 50,
+                        });
+                    } else {
+                        // Target is dead
+                        **target = None;
+                    }
+                } else {
+                    // Tower needs to find a new target
+                    let closest = Self::get_closest_creep(
+                        positions
+                            .iter()
+                            .map(|(entity, position)| (entity, position.translation)),
+                        tower_pos.translation(),
+                    );
+
+                    if let Some((creep, distance)) = closest {
+                        if dbg!(attack.range.powf(2.)) >= dbg!(distance) {
+                            **target = Some(creep);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_closest_creep(
+        creeps: impl Iterator<Item = (Entity, Vec3)>,
+        position: Vec3,
+    ) -> Option<(Entity, f32)> {
+        let mut closest = None;
+        let mut closest_distance_squared = f32::MAX;
+        for (creep, creep_pos) in creeps {
+            let distance_squared = creep_pos.distance_squared(position);
+            if distance_squared < closest_distance_squared {
+                closest = Some((creep, distance_squared));
+                closest_distance_squared = distance_squared;
+            }
+        }
+        closest
     }
 }
