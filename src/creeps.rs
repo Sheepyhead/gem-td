@@ -162,7 +162,7 @@ impl CreepSpawner {
                 PbrBundle {
                     mesh: meshes.add(Cube { size: 0.5 }.into()),
                     material: mats.add(Color::BLACK.into()),
-                    transform: Transform::from_xyz(0.5, 0.25, 0.5 + MAP_WIDTH as f32 - 1.),
+                    transform: Transform::from_xyz(0.5, 0.25, MAP_WIDTH as f32 - 1.),
                     ..default()
                 },
                 Creep,
@@ -179,7 +179,7 @@ impl CreepSpawner {
                     nav: Nav::new(1.),
                 },
                 CreepPos {
-                    pos: Vec2::new(0.5, 0.5 + MAP_WIDTH as f32 - 1.),
+                    pos: Vec2::new(0.5, MAP_WIDTH as f32 - 1.),
                 },
                 Name::new("Creep"),
             ));

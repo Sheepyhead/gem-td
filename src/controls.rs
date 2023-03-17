@@ -221,7 +221,6 @@ pub fn pick_building(
                 let mut picked_tower = None;
                 for (entity, transform) in &dirt {
                     if transform.translation().xz().distance(cursor_pos) <= 1.0 {
-                        println!("Picked tower {entity:?}");
                         picked_tower = Some(entity);
                     }
                 }

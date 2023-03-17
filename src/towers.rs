@@ -23,10 +23,18 @@ impl BasicTower {
         mut lines: ResMut<DebugLines>,
         time: Res<Time>,
         mut writer: EventWriter<Damaged>,
-        mut towers: Query<(&mut Cooldown, &mut Target, &GlobalTransform), With<BasicTower>>,
+        mut towers: Query<
+            (
+                &mut Cooldown,
+                &mut Target,
+                &GlobalTransform,
+                Option<&GemType>,
+            ),
+            With<BasicTower>,
+        >,
         positions: Query<(Entity, &Transform), With<HitPoints>>,
     ) {
-        for (mut cooldown, mut target, tower_pos) in &mut towers {
+        for (mut cooldown, mut target, tower_pos, typ) in &mut towers {
             cooldown.tick(time.delta());
             if cooldown.finished() {
                 if let Some(target_entity) = **target {
@@ -38,7 +46,11 @@ impl BasicTower {
                             tower_pos.translation(),
                             target_pos.translation,
                             0.25,
-                            Color::RED,
+                            if let Some(typ) = typ {
+                                (*typ).into()
+                            } else {
+                                Color::RED
+                            },
                         );
 
                         writer.send(Damaged {
@@ -121,8 +133,11 @@ pub fn uncover_dirt(
         let mut timer = Timer::from_seconds(time, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(time));
 
+        let typ = GemType::Emerald;
+
         commands.entity(entity).insert((
-            mats.add(color),
+            mats.add(typ.into()),
+            typ,
             BasicTower,
             Cooldown(timer),
             Target(None),
@@ -150,4 +165,25 @@ pub fn rebuild_navmesh(
         )
         .unwrap(),
     );
+}
+
+#[derive(Component, Clone, Copy)]
+pub enum GemType {
+    Emerald,
+}
+
+impl From<GemType> for StandardMaterial {
+    fn from(val: GemType) -> Self {
+        let mut color: StandardMaterial = Into::<Color>::into(val).into();
+        color.alpha_mode = AlphaMode::Add;
+        color
+    }
+}
+
+impl From<GemType> for Color {
+    fn from(value: GemType) -> Self {
+        match value {
+            GemType::Emerald => Color::GREEN,
+        }
+    }
 }
