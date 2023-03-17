@@ -63,10 +63,7 @@ pub fn uncover_dirt(
             mats.add(typ.into()),
             gem_tower,
             Tower,
-            LaserAttack {
-                range: gem_tower.range(),
-                color: typ.into(),
-            },
+            LaserAttack::from(gem_tower),
             Cooldown(timer),
             Target(None),
         ));
@@ -151,16 +148,26 @@ pub struct GemTower {
     typ: GemType,
 }
 
-impl GemTower {
-    pub fn range(self) -> f32 {
-        match self.typ {
-            GemType::Ruby
-            | GemType::Emerald
-            | GemType::Diamond
-            | GemType::Amethyst
-            | GemType::Opal => 5.,
-            GemType::Sapphire | GemType::Topaz => 6.,
-            GemType::Aquamarine => 4.,
+impl From<GemTower> for LaserAttack {
+    fn from(value: GemTower) -> Self {
+        Self {
+            range: match value.typ {
+                GemType::Ruby
+                | GemType::Emerald
+                | GemType::Diamond
+                | GemType::Amethyst
+                | GemType::Opal => 5.,
+                GemType::Sapphire | GemType::Topaz => 6.,
+                GemType::Aquamarine => 4.,
+            },
+            color: value.typ.into(),
+            damage: match value.typ {
+                GemType::Ruby => 4,
+                GemType::Sapphire | GemType::Emerald | GemType::Amethyst | GemType::Aquamarine => 2,
+                GemType::Diamond => 5,
+                GemType::Opal => 1,
+                GemType::Topaz => 3,
+            },
         }
     }
 }
@@ -169,6 +176,7 @@ impl GemTower {
 pub struct LaserAttack {
     range: f32,
     color: Color,
+    damage: u32,
 }
 
 impl LaserAttack {
@@ -199,7 +207,7 @@ impl LaserAttack {
 
                         writer.send(Damaged {
                             target: target_entity,
-                            value: 50,
+                            value: attack.damage,
                         });
                     } else {
                         // Target is dead

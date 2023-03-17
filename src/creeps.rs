@@ -166,7 +166,7 @@ impl CreepSpawner {
                     ..default()
                 },
                 Creep,
-                HitPoints::new(100),
+                HitPoints::new(15),
                 NavBundle {
                     pathfind: Pathfind::new(
                         navmesh,
