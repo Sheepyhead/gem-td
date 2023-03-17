@@ -146,6 +146,6 @@ impl Position2 for CreepPos {
 
 pub fn update_creep_position(mut creeps: Query<(&mut Transform, &CreepPos), Changed<CreepPos>>) {
     for (mut transform, pos) in &mut creeps {
-        transform.translation = dbg!(Vec3::new(pos.pos.x, transform.translation.y, pos.pos.y));
+        transform.translation = Vec3::new(pos.pos.x, transform.translation.y, pos.pos.y);
     }
 }

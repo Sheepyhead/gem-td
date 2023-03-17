@@ -26,10 +26,10 @@ use bevy_rapier3d::prelude::*;
 use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
 };
-use controls::{build_on_click, show_highlight, update_under_cursor, UnderCursor};
+use controls::{build_on_click, rebuild_navmesh, show_highlight, update_under_cursor, UnderCursor};
 use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
 use seldom_map_nav::prelude::*;
-use towers::BasicTower;
+use towers::{BasicTower, BuildGrid};
 
 mod common;
 mod controls;
@@ -41,7 +41,7 @@ pub const CLEAR: Color = Color::BLACK;
 pub const WINDOW_HEIGHT: f32 = 600.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
-pub const CREEP_CLEARANCE: f32 = 0.;
+pub const CREEP_CLEARANCE: f32 = 0.25;
 
 fn main() {
     App::new()
@@ -78,6 +78,7 @@ fn main() {
         .add_event::<Dead>()
         .init_resource::<Builds>()
         .init_resource::<UnderCursor>()
+        .init_resource::<BuildGrid>()
         .add_startup_system(startup)
         .add_systems((
             update_under_cursor,
@@ -98,7 +99,7 @@ fn main() {
         .add_systems((
             CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
             check_state_change,
-            // rebuild_navmesh.in_schedule(OnExit(Phase::Build)),
+            rebuild_navmesh.in_schedule(OnExit(Phase::Build)),
         ))
         .run();
 }

@@ -1,9 +1,12 @@
-use bevy::{math::Vec3Swizzles, prelude::*};
+use std::fmt::Debug;
+
+use bevy::{math::Vec3Swizzles, prelude::*, utils::HashSet};
 use bevy_prototype_lyon::prelude::*;
 
 use crate::{
     common::Fadeout,
     creeps::{Damaged, HitPoints},
+    MAP_HEIGHT, MAP_WIDTH,
 };
 
 #[derive(Component)]
@@ -84,25 +87,22 @@ impl BasicTower {
 #[derive(Component, Deref, DerefMut)]
 pub struct Cooldown(pub Timer);
 
-// FIXME:
-// pub fn rebuild_navmesh(
-//     mut commands: Commands,
-//     navmeshes: Query<Entity, With<Navmeshes>>,
-//     occupied_tiles: Query<&Transform, With<TileOccupied>>,
-// ) {
-//     let map = navmeshes.single();
-//     let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
-//     for pos in &occupied_tiles {
-//         tilemap[(pos.translation.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
-//     }
-//     let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
-//     commands.entity(map).insert(
-//         Navmeshes::generate(
-//             [MAP_WIDTH, MAP_HEIGHT].into(),
-//             Vec2::new(1., 1.),
-//             navability,
-//             [CREEP_CLEARANCE],
-//         )
-//         .unwrap(),
-//     );
-// }
+#[derive(Default, Deref, DerefMut, Resource)]
+pub struct BuildGrid(HashSet<UVec2>);
+
+impl Debug for BuildGrid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut text = String::with_capacity((MAP_WIDTH * MAP_HEIGHT + MAP_HEIGHT) as usize);
+        for y in 0..MAP_HEIGHT {
+            for x in 0..MAP_WIDTH {
+                text.push(if self.contains(&UVec2::new(x, y)) {
+                    'X'
+                } else {
+                    'O'
+                });
+            }
+            text.push('\n');
+        }
+        write!(f, "{}", &text)
+    }
+}

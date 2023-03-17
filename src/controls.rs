@@ -9,11 +9,12 @@ use bevy::{
     },
 };
 use bevy_rapier3d::prelude::*;
+use seldom_map_nav::prelude::*;
 
 use crate::{
     common::{ray_from_screenspace, Builds},
-    towers::{BasicTower, Cooldown, Target},
-    Phase,
+    towers::{BasicTower, BuildGrid, Cooldown, Target},
+    Phase, CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
 pub fn update_under_cursor(
@@ -68,13 +69,7 @@ pub fn show_highlight(
 
     if let Some(position) = **under_cursor {
         let mut moved_existing = false;
-        let top_corner_position = Vec2::new(position.x.ceil() - 0.5, position.y.ceil() - 0.5);
-        let positions = [
-            top_corner_position,
-            Vec2::new(top_corner_position.x, top_corner_position.y + 1.),
-            Vec2::new(top_corner_position.x + 1., top_corner_position.y),
-            Vec2::new(top_corner_position.x + 1., top_corner_position.y + 1.),
-        ];
+        let positions = get_squares_from_pos(position);
         for (index, (_, mut transform)) in (&mut existing_highlights).into_iter().enumerate() {
             moved_existing = true;
             *transform =
@@ -112,6 +107,16 @@ pub fn show_highlight(
     }
 }
 
+fn get_squares_from_pos(position: Vec2) -> [Vec2; 4] {
+    let top_corner_position = Vec2::new(position.x.ceil() - 0.5, position.y.ceil() - 0.5);
+    [
+        top_corner_position,
+        Vec2::new(top_corner_position.x, top_corner_position.y + 1.),
+        Vec2::new(top_corner_position.x + 1., top_corner_position.y),
+        Vec2::new(top_corner_position.x + 1., top_corner_position.y + 1.),
+    ]
+}
+
 pub fn build_on_click(
     mut commands: Commands,
     mut mouse: EventReader<MouseButtonInput>,
@@ -119,6 +124,7 @@ pub fn build_on_click(
     mut next_phase: ResMut<NextState<Phase>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut mats: ResMut<Assets<StandardMaterial>>,
+    mut build_grid: ResMut<BuildGrid>,
     phase: Res<State<Phase>>,
     cursor_pos: Res<UnderCursor>,
 ) {
@@ -157,8 +163,36 @@ pub fn build_on_click(
                     Cooldown(timer),
                     Target(None),
                 ));
+                #[allow(clippy::cast_sign_loss)]
+                let positions = get_squares_from_pos(pos.xz())
+                    .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
+                for pos in &positions {
+                    build_grid.insert(*pos);
+                }
                 **builds -= 1;
             }
         }
     }
+}
+
+pub fn rebuild_navmesh(
+    mut commands: Commands,
+    build_grid: Res<BuildGrid>,
+    navmeshes: Query<Entity, With<Navmeshes>>,
+) {
+    let map = navmeshes.single();
+    let mut tilemap = [Navability::Navable; ((MAP_WIDTH * MAP_HEIGHT) as usize)];
+    for pos in dbg!(build_grid).iter() {
+        tilemap[(pos.y * MAP_WIDTH + pos.x) as usize] = Navability::Solid;
+    }
+    let navability = |pos: UVec2| tilemap[(pos.y * MAP_WIDTH + pos.x) as usize];
+    commands.entity(map).insert(
+        Navmeshes::generate(
+            [MAP_WIDTH, MAP_HEIGHT].into(),
+            Vec2::new(1., 1.),
+            navability,
+            [CREEP_CLEARANCE],
+        )
+        .unwrap(),
+    );
 }
