@@ -16,6 +16,7 @@ impl Plugin for TowerAbilitiesPlugin {
             SapphireSlowOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
             SapphireSlow::changed.in_set(OnUpdate(Phase::Spawn)),
             SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
+            CritOnHit::crit.in_set(OnUpdate(Phase::Spawn)),
         ));
     }
 }
@@ -148,6 +149,35 @@ impl SapphireSlow {
             if sapphire.duration.tick(time.delta()).finished() {
                 commands.entity(entity).remove::<SapphireSlow>();
                 slow.remove(&SlowSource::Sapphire);
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct CritOnHit;
+
+impl CritOnHit {
+    fn crit(
+        mut hits: EventReader<Hit>,
+        mut deads: EventWriter<Dead>,
+        mut creeps: Query<&mut HitPoints>,
+        towers: Query<(), With<CritOnHit>>,
+    ) {
+        for Hit {
+            source,
+            target,
+            value,
+        } in hits.iter()
+        {
+            if let (Ok(..), Ok(mut creep)) = (towers.get(*source), creeps.get_mut(*target)) {
+                if fastrand::f32() < 0.25 {
+                    println!("CRIT!");
+                    creep.sub(*value);
+                    if creep.dead() {
+                        deads.send(Dead(*target));
+                    }
+                }
             }
         }
     }
