@@ -14,7 +14,7 @@ use seldom_map_nav::prelude::*;
 
 use crate::{
     creeps::{Creep, CreepType, Hit, HitPoints},
-    tower_abilities::SlowPoisonOnHit,
+    tower_abilities::{SapphireSlowOnHit, SlowPoisonOnHit},
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
@@ -210,6 +210,15 @@ impl GemTower {
                 dps: 16,
                 slow: 50,
                 duration: 8.,
+            }),
+            (GemType::Sapphire, quality) => entity.insert(SapphireSlowOnHit {
+                slow: match quality {
+                    GemQuality::Chipped => 20,
+                    GemQuality::Flawed => 25,
+                    GemQuality::Normal => 30,
+                    GemQuality::Flawless => 35,
+                    GemQuality::Perfect => 40,
+                },
             }),
             _ => entity,
         };

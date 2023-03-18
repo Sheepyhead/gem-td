@@ -186,7 +186,7 @@ pub struct CreepSpawner {
 impl Default for CreepSpawner {
     fn default() -> Self {
         Self {
-            timer: Timer::from_seconds(0.3, TimerMode::Repeating),
+            timer: Timer::from_seconds(2., TimerMode::Repeating),
             amount: 10,
         }
     }
@@ -290,6 +290,7 @@ impl CreepType {
 #[derive(PartialEq, Eq, Hash)]
 pub enum SlowSource {
     Poison,
+    Sapphire,
 }
 
 #[derive(Component, Default, Deref, DerefMut)]

@@ -13,6 +13,9 @@ impl Plugin for TowerAbilitiesPlugin {
             SlowPoisonOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
             SlowPoison::add.in_set(OnUpdate(Phase::Spawn)),
             SlowPoison::update.in_set(OnUpdate(Phase::Spawn)),
+            SapphireSlowOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
+            SapphireSlow::changed.in_set(OnUpdate(Phase::Spawn)),
+            SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
         ));
     }
 }
@@ -89,6 +92,62 @@ impl SlowPoison {
             if poison.duration.tick(time.delta()).finished() {
                 commands.entity(creep).remove::<SlowPoison>();
                 slow.remove(&SlowSource::Poison);
+            }
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+pub struct SapphireSlowOnHit {
+    pub slow: u32,
+}
+
+impl SapphireSlowOnHit {
+    pub fn on_hit(
+        mut commands: Commands,
+        mut events: EventReader<Hit>,
+        towers: Query<&SapphireSlowOnHit>,
+    ) {
+        for Hit { source, target, .. } in events.iter() {
+            if let Ok(tower) = towers.get(*source) {
+                commands
+                    .entity(*target)
+                    .insert(Into::<SapphireSlow>::into(*tower));
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct SapphireSlow {
+    slow: u32,
+    duration: Timer,
+}
+
+impl From<SapphireSlowOnHit> for SapphireSlow {
+    fn from(value: SapphireSlowOnHit) -> Self {
+        Self {
+            slow: value.slow,
+            duration: Timer::from_seconds(4., TimerMode::Once),
+        }
+    }
+}
+
+impl SapphireSlow {
+    fn changed(mut creeps: Query<(&mut Slow, &SapphireSlow), Changed<SapphireSlow>>) {
+        for (mut slow, sapphire) in &mut creeps {
+            slow.insert(SlowSource::Sapphire, sapphire.slow);
+        }
+    }
+    fn update(
+        mut commands: Commands,
+        time: Res<Time>,
+        mut creeps: Query<(Entity, &mut Slow, &mut SapphireSlow)>,
+    ) {
+        for (entity, mut slow, mut sapphire) in &mut creeps {
+            if sapphire.duration.tick(time.delta()).finished() {
+                commands.entity(entity).remove::<SapphireSlow>();
+                slow.remove(&SlowSource::Sapphire);
             }
         }
     }
