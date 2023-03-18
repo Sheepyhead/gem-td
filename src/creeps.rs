@@ -1,4 +1,7 @@
-use bevy::prelude::{shape::Cube, *};
+use bevy::{
+    prelude::{shape::Cube, *},
+    utils::HashMap,
+};
 use seldom_map_nav::prelude::*;
 
 use crate::{
@@ -8,19 +11,22 @@ use crate::{
     CurrentLevel, Phase, CREEP_CLEARANCE, MAP_WIDTH, RESOLUTION, WINDOW_HEIGHT,
 };
 
+const CREEP_BASE_SPEED: f32 = 1.;
+
 #[derive(Component)]
 pub struct Creep {
     pub typ: CreepType,
 }
 
-pub struct Damaged {
+pub struct Hit {
+    pub source: Entity,
     pub target: Entity,
     pub value: u32,
 }
 
-impl Damaged {
+impl Hit {
     pub fn consume(
-        mut reader: EventReader<Damaged>,
+        mut reader: EventReader<Hit>,
         mut writer: EventWriter<Dead>,
         mut targets: Query<&mut HitPoints>,
     ) {
@@ -49,11 +55,11 @@ impl HitPoints {
         }
     }
 
-    fn sub(&mut self, value: u32) {
+    pub fn sub(&mut self, value: u32) {
         self.current = self.current.saturating_sub(value);
     }
 
-    fn dead(&self) -> bool {
+    pub fn dead(&self) -> bool {
         self.current == 0
     }
 
@@ -181,7 +187,7 @@ impl Default for CreepSpawner {
     fn default() -> Self {
         Self {
             timer: Timer::from_seconds(0.3, TimerMode::Repeating),
-            amount: 20,
+            amount: 10,
         }
     }
 }
@@ -236,12 +242,13 @@ impl CreepSpawner {
                         NavQuery::Accuracy,
                         NavPathMode::Accuracy,
                     ),
-                    nav: Nav::new(1.),
+                    nav: Nav::new(CREEP_BASE_SPEED),
                 },
                 CreepPos {
                     pos: Vec2::new(0.5, MAP_WIDTH as f32 - 1.),
                 },
                 Name::new("Creep"),
+                Slow::default(),
             ));
         }
         if spawns_left == 0 && creeps.iter().count() == 0 && phase.0.is_none() {
@@ -276,6 +283,23 @@ impl CreepType {
             Hits::Ground => matches!(self, CreepType::Ground),
             Hits::Flying => matches!(self, CreepType::Flying),
             Hits::All => true,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash)]
+pub enum SlowSource {
+    Poison,
+}
+
+#[derive(Component, Default, Deref, DerefMut)]
+pub struct Slow(HashMap<SlowSource, u32>);
+
+impl Slow {
+    pub fn change(mut creeps: Query<(&mut Nav, &Slow), Changed<Slow>>) {
+        for (mut creep, slow) in &mut creeps {
+            let modifier = slow.values().sum::<u32>().min(100);
+            creep.speed = CREEP_BASE_SPEED - (modifier as f32 / 100.) / CREEP_BASE_SPEED;
         }
     }
 }

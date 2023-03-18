@@ -30,14 +30,16 @@ use controls::{
     build_on_click, pick_building, remove_highlight, show_highlight, update_under_cursor,
     UnderCursor,
 };
-use creeps::{CreepSpawner, Damaged, Dead, HitPoints};
+use creeps::{CreepSpawner, Dead, Hit, HitPoints, Slow};
 use seldom_map_nav::prelude::*;
+use tower_abilities::TowerAbilitiesPlugin;
 use towers::{rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack};
 
 mod common;
 mod controls;
 mod creeps;
 mod progress_bar;
+mod tower_abilities;
 mod towers;
 
 pub const CLEAR: Color = Color::BLACK;
@@ -77,18 +79,19 @@ fn main() {
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         // Internal plugins
         .add_state::<Phase>()
-        .add_event::<Damaged>()
+        .add_event::<Hit>()
         .add_event::<Dead>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
         .init_resource::<BuildGrid>()
+        .add_plugin(TowerAbilitiesPlugin)
         .add_startup_system(startup)
         .add_systems((
             update_under_cursor,
             LaserAttack::attack,
             Fadeout::fadeout,
-            Damaged::consume,
+            Hit::consume,
             TrackWorldObjectToScreenPosition::track,
             MovingTo::move_to,
             Dead::death,
@@ -108,6 +111,7 @@ fn main() {
             remove_highlight.in_schedule(OnExit(Phase::Build)),
             pick_building.in_set(OnUpdate(Phase::Pick)),
             next_level.in_schedule(OnExit(Phase::Spawn)),
+            Slow::change.in_set(OnUpdate(Phase::Spawn)),
         ))
         .run();
 }

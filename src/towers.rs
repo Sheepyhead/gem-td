@@ -5,6 +5,7 @@ use std::{
 };
 
 use bevy::{
+    ecs::system::EntityCommands,
     prelude::{shape::Cube, *},
     utils::HashSet,
 };
@@ -12,7 +13,8 @@ use bevy_prototype_debug_lines::DebugLines;
 use seldom_map_nav::prelude::*;
 
 use crate::{
-    creeps::{Creep, CreepType, Damaged, HitPoints},
+    creeps::{Creep, CreepType, Hit, HitPoints},
+    tower_abilities::SlowPoisonOnHit,
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
@@ -64,11 +66,11 @@ pub fn uncover_dirt(
         let mut timer = Timer::from_seconds(time, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(time));
 
-        let gem_tower = GemTower {
+        let mut gem_tower = GemTower {
             typ: GemType::random(),
             quality: GemQuality::random(),
         };
-        commands.entity(entity).insert((
+        gem_tower.add_abilities(commands.entity(entity).insert((
             meshes.add(Into::<Cube>::into(gem_tower).into()),
             mats.add(gem_tower.typ.into()),
             gem_tower,
@@ -77,7 +79,7 @@ pub fn uncover_dirt(
             LaserAttack::from(gem_tower),
             Cooldown(timer),
             Target(None),
-        ));
+        )));
     }
 }
 
@@ -181,6 +183,38 @@ pub struct GemTower {
     quality: GemQuality,
 }
 
+impl GemTower {
+    pub fn add_abilities(&mut self, entity: &mut EntityCommands) {
+        match (self.typ, self.quality) {
+            (GemType::Emerald, GemQuality::Chipped) => entity.insert(SlowPoisonOnHit {
+                dps: 2,
+                slow: 15,
+                duration: 3.,
+            }),
+            (GemType::Emerald, GemQuality::Flawed) => entity.insert(SlowPoisonOnHit {
+                dps: 3,
+                slow: 20,
+                duration: 4.,
+            }),
+            (GemType::Emerald, GemQuality::Normal) => entity.insert(SlowPoisonOnHit {
+                dps: 5,
+                slow: 25,
+                duration: 5.,
+            }),
+            (GemType::Emerald, GemQuality::Flawless) => entity.insert(SlowPoisonOnHit {
+                dps: 8,
+                slow: 30,
+                duration: 6.,
+            }),
+            (GemType::Emerald, GemQuality::Perfect) => entity.insert(SlowPoisonOnHit {
+                dps: 16,
+                slow: 50,
+                duration: 8.,
+            }),
+            _ => entity,
+        };
+    }
+}
 impl Display for GemTower {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -330,32 +364,48 @@ impl LaserAttack {
     pub fn attack(
         mut lines: ResMut<DebugLines>,
         time: Res<Time>,
-        mut writer: EventWriter<Damaged>,
+        mut writer: EventWriter<Hit>,
         mut towers: Query<
-            (&mut Cooldown, &mut Target, &GlobalTransform, &LaserAttack),
+            (
+                Entity,
+                &mut Cooldown,
+                &mut Target,
+                &GlobalTransform,
+                &LaserAttack,
+            ),
             With<Tower>,
         >,
         positions: Query<(Entity, &Transform, &Creep), With<HitPoints>>,
     ) {
-        for (mut cooldown, mut target, tower_pos, attack) in &mut towers {
+        for (tower, mut cooldown, mut target, tower_pos, attack) in &mut towers {
             cooldown.tick(time.delta());
             if cooldown.finished() {
                 if let Some(target_entity) = **target {
                     // Tower has a target
                     if let Ok((_, target_pos, _)) = positions.get(target_entity) {
-                        // Target is alive
-                        cooldown.reset();
-                        lines.line_colored(
-                            tower_pos.translation(),
-                            target_pos.translation,
-                            0.25,
-                            attack.color,
-                        );
+                        if target_pos
+                            .translation
+                            .distance_squared(tower_pos.translation())
+                            > attack.range.powf(2.)
+                        {
+                            // Target is out of range
+                            **target = None;
+                        } else {
+                            // Target is alive and in range
+                            cooldown.reset();
+                            lines.line_colored(
+                                tower_pos.translation(),
+                                target_pos.translation,
+                                0.25,
+                                attack.color,
+                            );
 
-                        writer.send(Damaged {
-                            target: target_entity,
-                            value: attack.damage.clone().get_value(),
-                        });
+                            writer.send(Hit {
+                                source: tower,
+                                target: target_entity,
+                                value: attack.damage.clone().get_value(),
+                            });
+                        }
                     } else {
                         // Target is dead
                         **target = None;
