@@ -112,6 +112,7 @@ fn main() {
             pick_building.in_set(OnUpdate(Phase::Pick)),
             next_level.in_schedule(OnExit(Phase::Spawn)),
             Slow::change.in_set(OnUpdate(Phase::Spawn)),
+            LaserAttack::update_multiple_targets,
         ))
         .run();
 }

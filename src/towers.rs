@@ -24,8 +24,11 @@ pub struct Tower;
 #[derive(Component)]
 pub struct Dirt;
 
-#[derive(Component, Deref, DerefMut)]
-pub struct Target(pub Option<Entity>);
+#[derive(Component, Clone)]
+pub enum Target {
+    Single(Option<Entity>),
+    Multiple(Vec<Entity>),
+}
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Cooldown(pub Timer);
@@ -78,7 +81,7 @@ pub fn uncover_dirt(
             Tower,
             LaserAttack::from(gem_tower),
             Cooldown(timer),
-            Target(None),
+            Target::Single(None),
         )));
     }
 }
@@ -221,6 +224,7 @@ impl GemTower {
                 },
             }),
             (GemType::Diamond, ..) => entity.insert(CritOnHit),
+            (GemType::Topaz, ..) => entity.insert(Target::Multiple(vec![])),
             _ => entity,
         };
     }
@@ -390,16 +394,34 @@ impl LaserAttack {
         for (tower, mut cooldown, mut target, tower_pos, attack) in &mut towers {
             cooldown.tick(time.delta());
             if cooldown.finished() {
-                if let Some(target_entity) = **target {
+                let targets = match target.clone() {
+                    Target::Single(target) => match target {
+                        Some(target) => vec![target],
+                        None => vec![],
+                    },
+                    Target::Multiple(targets) => targets,
+                };
+                for target_entity in &targets {
                     // Tower has a target
-                    if let Ok((_, target_pos, _)) = positions.get(target_entity) {
+                    if let Ok((_, target_pos, _)) = positions.get(*target_entity) {
                         if target_pos
                             .translation
                             .distance_squared(tower_pos.translation())
                             > attack.range.powf(2.)
                         {
                             // Target is out of range
-                            **target = None;
+                            match target.clone() {
+                                Target::Single(_) => *target = Target::Single(None),
+                                Target::Multiple(targets) => {
+                                    *target = Target::Multiple(
+                                        targets
+                                            .iter()
+                                            .filter(|targ| target_entity != *targ)
+                                            .copied()
+                                            .collect(),
+                                    );
+                                }
+                            }
                         } else {
                             // Target is alive and in range
                             cooldown.reset();
@@ -412,29 +434,65 @@ impl LaserAttack {
 
                             writer.send(Hit {
                                 source: tower,
-                                target: target_entity,
+                                target: *target_entity,
                                 value: attack.damage.clone().get_value(),
                             });
                         }
                     } else {
                         // Target is dead
-                        **target = None;
-                    }
-                } else {
-                    // Tower needs to find a new target
-                    let closest = Self::get_closest_creep(
-                        positions.iter().map(|(entity, position, Creep { typ })| {
-                            (entity, position.translation, *typ)
-                        }),
-                        tower_pos.translation(),
-                    );
-
-                    if let Some((creep, distance, typ)) = closest {
-                        if attack.range.powf(2.) >= distance && typ.hits(attack.hits) {
-                            **target = Some(creep);
+                        match target.clone() {
+                            Target::Single(_) => *target = Target::Single(None),
+                            Target::Multiple(targets) => {
+                                *target = Target::Multiple(
+                                    targets
+                                        .iter()
+                                        .filter(|targ| target_entity != *targ)
+                                        .copied()
+                                        .collect(),
+                                );
+                            }
                         }
                     }
                 }
+                if targets.is_empty() {
+                    // Tower needs to find a new target
+                    if let Target::Single(_) = *target {
+                        let closest = Self::get_closest_creep(
+                            positions.iter().map(|(entity, position, Creep { typ })| {
+                                (entity, position.translation, *typ)
+                            }),
+                            tower_pos.translation(),
+                        );
+
+                        if let Some((creep, distance, typ)) = closest {
+                            if attack.range.powf(2.) >= distance && typ.hits(attack.hits) {
+                                *target = Target::Single(Some(creep));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn update_multiple_targets(
+        positions: Query<(Entity, &Transform, &Creep), (With<HitPoints>, Changed<Transform>)>,
+        mut towers: Query<(&mut Target, &GlobalTransform, &LaserAttack), With<Tower>>,
+    ) {
+        for (mut target, tower_pos, attack) in &mut towers {
+            if let Target::Multiple(_) = target.clone() {
+                let targets = Self::get_creeps_in_range(
+                    positions.iter().map(|(entity, position, Creep { typ })| {
+                        (entity, position.translation, *typ)
+                    }),
+                    tower_pos.translation(),
+                    attack.range,
+                )
+                .iter()
+                .filter(|(_, typ)| typ.hits(attack.hits))
+                .map(|(entity, _)| *entity)
+                .collect();
+                *target = Target::Multiple(targets);
             }
         }
     }
@@ -453,6 +511,17 @@ impl LaserAttack {
             }
         }
         closest
+    }
+
+    fn get_creeps_in_range(
+        creeps: impl Iterator<Item = (Entity, Vec3, CreepType)>,
+        position: Vec3,
+        range: f32,
+    ) -> Vec<(Entity, CreepType)> {
+        creeps
+            .filter(|(_, creep_pos, _)| creep_pos.distance_squared(position) <= range.powf(2.))
+            .map(|(creep, _, typ)| (creep, typ))
+            .collect()
     }
 }
 
