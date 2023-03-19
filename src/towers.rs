@@ -18,6 +18,8 @@ use crate::{
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
+pub const BASE_TOWER_SPEED: f32 = 1.0;
+
 #[derive(Component)]
 pub struct Tower;
 
@@ -64,15 +66,11 @@ pub fn uncover_dirt(
             Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
         color.alpha_mode = AlphaMode::Add;
 
-        // Make a cooldown timer that starts in a finished state
-        let time = 1.0;
-        let mut timer = Timer::from_seconds(time, TimerMode::Once);
-        timer.tick(Duration::from_secs_f32(time));
-
         let mut gem_tower = GemTower {
             typ: GemType::random(),
             quality: GemQuality::random(),
         };
+        let cooldown: Cooldown = gem_tower.into();
         gem_tower.add_abilities(commands.entity(entity).insert((
             meshes.add(Into::<Cube>::into(gem_tower).into()),
             mats.add(gem_tower.typ.into()),
@@ -80,7 +78,7 @@ pub fn uncover_dirt(
             Name::new(gem_tower.to_string()),
             Tower,
             LaserAttack::from(gem_tower),
-            Cooldown(timer),
+            cooldown,
             Target::Single(None),
         )));
     }
@@ -237,6 +235,7 @@ impl GemTower {
         };
     }
 }
+
 impl Display for GemTower {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -350,6 +349,30 @@ impl From<GemTower> for LaserAttack {
                 _ => Hits::All,
             },
         }
+    }
+}
+
+impl From<GemTower> for Cooldown {
+    fn from(value: GemTower) -> Self {
+        // Make a cooldown timer that starts in a finished state
+        let time = match (value.typ, value.quality) {
+            (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
+            (
+                GemType::Topaz
+                | GemType::Amethyst
+                | GemType::Emerald
+                | GemType::Ruby
+                | GemType::Sapphire
+                | GemType::Diamond
+                | GemType::Opal,
+                GemQuality::Chipped,
+            ) => BASE_TOWER_SPEED - 0.2,
+            _ => BASE_TOWER_SPEED,
+        };
+        let mut timer = Timer::from_seconds(time, TimerMode::Once);
+        timer.tick(Duration::from_secs_f32(time));
+
+        Cooldown(timer)
     }
 }
 
