@@ -17,6 +17,7 @@ impl Plugin for TowerAbilitiesPlugin {
             SapphireSlow::changed.in_set(OnUpdate(Phase::Spawn)),
             SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
             CritOnHit::crit.in_set(OnUpdate(Phase::Spawn)),
+            SplashOnHit::splash.in_set(OnUpdate(Phase::Spawn)),
         ));
     }
 }
@@ -176,6 +177,50 @@ impl CritOnHit {
                     creep.sub(*value);
                     if creep.dead() {
                         deads.send(Dead(*target));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct SplashOnHit {
+    pub multiplier: f32,
+    pub range: f32,
+}
+
+impl SplashOnHit {
+    fn splash(
+        mut hits: EventReader<Hit>,
+        mut dead: EventWriter<Dead>,
+        towers: Query<&SplashOnHit>,
+        mut creeps: Query<(Entity, &GlobalTransform, &mut HitPoints)>,
+    ) {
+        for Hit {
+            source,
+            target,
+            value,
+        } in hits.iter()
+        {
+            if let Ok(SplashOnHit { multiplier, range }) = towers.get(*source) {
+                let target_pos = match creeps.get(*target) {
+                    Ok(value) => *value.1,
+                    Err(_) => continue,
+                };
+                for (creep, _, mut hitpoints) in
+                    creeps.iter_mut().filter(|(creep, transform, _)| {
+                        creep != target
+                            && transform
+                                .translation()
+                                .distance_squared(target_pos.translation())
+                                <= range.powf(2.)
+                    })
+                {
+                    #[allow(clippy::cast_sign_loss)]
+                    hitpoints.sub((*value as f32 * multiplier) as u32);
+                    if hitpoints.dead() {
+                        dead.send(Dead(creep));
                     }
                 }
             }

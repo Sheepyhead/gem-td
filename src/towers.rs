@@ -14,7 +14,7 @@ use seldom_map_nav::prelude::*;
 
 use crate::{
     creeps::{Creep, CreepType, Hit, HitPoints},
-    tower_abilities::{CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit},
+    tower_abilities::{CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit, SplashOnHit},
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
@@ -225,6 +225,14 @@ impl GemTower {
             }),
             (GemType::Diamond, ..) => entity.insert(CritOnHit),
             (GemType::Topaz, ..) => entity.insert(Target::Multiple(vec![])),
+            (GemType::Ruby, GemQuality::Perfect) => entity.insert(SplashOnHit {
+                multiplier: 0.5,
+                range: 3.5,
+            }),
+            (GemType::Ruby, ..) => entity.insert(SplashOnHit {
+                multiplier: 0.5,
+                range: 3.,
+            }),
             _ => entity,
         };
     }
