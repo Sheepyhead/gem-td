@@ -10,8 +10,8 @@ use bevy::{
 use bevy_rapier3d::prelude::*;
 
 use crate::{
-    common::{ray_from_screenspace, Builds},
-    towers::{BuildGrid, Dirt},
+    common::{get_squares_from_pos, ray_from_screenspace, Builds},
+    towers::{BuildGrid, JustBuilt, Tower},
     Phase,
 };
 
@@ -131,16 +131,6 @@ pub fn remove_highlight(mut commands: Commands, highlight: Query<Entity, With<Ti
     }
 }
 
-fn get_squares_from_pos(position: Vec2) -> [Vec2; 4] {
-    let top_corner_position = Vec2::new(position.x.ceil() - 0.5, position.y.ceil() - 0.5);
-    [
-        top_corner_position,
-        Vec2::new(top_corner_position.x, top_corner_position.y + 1.),
-        Vec2::new(top_corner_position.x + 1., top_corner_position.y),
-        Vec2::new(top_corner_position.x + 1., top_corner_position.y + 1.),
-    ]
-}
-
 pub fn build_on_click(
     mut commands: Commands,
     mut mouse: EventReader<MouseButtonInput>,
@@ -193,7 +183,8 @@ pub fn build_on_click(
                         transform: Transform::from_translation(pos),
                         ..default()
                     },
-                    Dirt,
+                    JustBuilt,
+                    Tower,
                 ));
 
                 **builds -= 1;
@@ -202,47 +193,35 @@ pub fn build_on_click(
     }
 }
 
-pub fn pick_building(
-    mut commands: Commands,
-    mut mouse: EventReader<MouseButtonInput>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut mats: ResMut<Assets<StandardMaterial>>,
-    mut next_phase: ResMut<NextState<Phase>>,
-    cursor_pos: Res<UnderCursor>,
-    dirt: Query<(Entity, &GlobalTransform), With<Dirt>>,
-) {
-    for event in mouse.iter() {
-        if let MouseButtonInput {
-            button: MouseButton::Left,
-            state: ButtonState::Pressed,
-        } = event
-        {
-            if let Some(cursor_pos) = **cursor_pos {
-                let mut picked_tower = None;
-                for (entity, transform) in &dirt {
-                    if transform.translation().xz().distance(cursor_pos) <= 1.0 {
-                        picked_tower = Some(entity);
-                    }
-                }
+#[derive(Default, Deref, DerefMut, Resource)]
+pub struct SelectedTower(Option<Entity>);
 
-                if let Some(picked_tower) = picked_tower {
-                    for (entity, transform) in &dirt {
-                        if entity == picked_tower {
-                            commands.entity(entity).remove::<Dirt>();
-                        } else {
-                            commands.entity(entity).despawn();
-                            commands.spawn((
-                                PbrBundle {
-                                    mesh: meshes.add(Cube { size: 2.0 }.into()),
-                                    material: mats.add(Color::ORANGE_RED.into()),
-                                    transform: transform.compute_transform(),
-                                    ..default()
-                                },
-                                Name::new("Dirt"),
-                            ));
+impl SelectedTower {
+    pub fn selection(
+        mut mouse: EventReader<MouseButtonInput>,
+        mut selected: ResMut<SelectedTower>,
+        under_cursor: Res<UnderCursor>,
+        towers: Query<(Entity, &GlobalTransform), With<Tower>>,
+    ) {
+        for event in mouse.iter() {
+            if let MouseButtonInput {
+                button: MouseButton::Left,
+                state: ButtonState::Pressed,
+            } = event
+            {
+                if let Some(cursor_pos) = **under_cursor {
+                    let mut picked_tower = None;
+                    for (entity, transform) in &towers {
+                        if transform.translation().xz().distance(cursor_pos) <= 1.0 {
+                            picked_tower = Some(entity);
                         }
                     }
-                    next_phase.set(Phase::Spawn);
+
+                    if let Some(picked_tower) = picked_tower {
+                        **selected = Some(picked_tower);
+                    } else {
+                        **selected = None;
+                    }
                 }
             }
         }

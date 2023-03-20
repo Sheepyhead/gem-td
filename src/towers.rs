@@ -6,6 +6,7 @@ use std::{
 
 use bevy::{
     ecs::system::EntityCommands,
+    math::Vec3Swizzles,
     prelude::{shape::Cube, *},
     utils::HashSet,
 };
@@ -13,11 +14,12 @@ use bevy_prototype_debug_lines::DebugLines;
 use seldom_map_nav::prelude::*;
 
 use crate::{
+    common::get_squares_from_pos,
     creeps::{Creep, CreepType, Hit, HitPoints},
     tower_abilities::{
         Aura, AuraType, CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit, SpeedModifiers, SplashOnHit,
     },
-    CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
+    Phase, CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
 pub const BASE_TOWER_SPEED: f32 = 1.0;
@@ -61,9 +63,9 @@ pub fn uncover_dirt(
     mut commands: Commands,
     mut mats: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    dirt: Query<Entity, With<Dirt>>,
+    just_built: Query<Entity, With<JustBuilt>>,
 ) {
-    for entity in &dirt {
+    for entity in &just_built {
         let mut color: StandardMaterial =
             Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
         color.alpha_mode = AlphaMode::Add;
@@ -597,3 +599,66 @@ impl Damage {
         }
     }
 }
+
+pub struct PickTower(pub Entity);
+
+impl PickTower {
+    pub fn pick_building(
+        mut commands: Commands,
+        mut events: EventReader<PickTower>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut mats: ResMut<Assets<StandardMaterial>>,
+        mut next_phase: ResMut<NextState<Phase>>,
+        just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
+    ) {
+        for PickTower(picked_tower) in events.iter() {
+            for (entity, transform) in &just_built {
+                if entity == *picked_tower {
+                    commands.entity(entity).remove::<JustBuilt>();
+                } else {
+                    commands.entity(entity).despawn_recursive();
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cube { size: 2.0 }.into()),
+                            material: mats.add(Color::ORANGE_RED.into()),
+                            transform: transform.compute_transform(),
+                            ..default()
+                        },
+                        Name::new("Dirt"),
+                        Dirt,
+                        Tower,
+                    ));
+                }
+            }
+            next_phase.set(Phase::Spawn);
+        }
+    }
+}
+
+#[derive(Deref, DerefMut)]
+pub struct RemoveTower(pub Entity);
+
+impl RemoveTower {
+    pub fn remove(
+        mut commands: Commands,
+        mut events: EventReader<RemoveTower>,
+        mut build_grid: ResMut<BuildGrid>,
+        towers: Query<&GlobalTransform>,
+    ) {
+        for RemoveTower(tower) in events.iter() {
+            if let Ok(transform) = towers.get(*tower) {
+                commands.entity(*tower).despawn_recursive();
+
+                #[allow(clippy::cast_sign_loss)]
+                let positions = get_squares_from_pos(transform.translation().xz())
+                    .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
+                for pos in positions {
+                    build_grid.remove(&pos);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct JustBuilt;

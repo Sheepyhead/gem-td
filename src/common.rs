@@ -149,3 +149,13 @@ pub fn update_creep_position(mut creeps: Query<(&mut Transform, &CreepPos), Chan
         transform.translation = Vec3::new(pos.pos.x, transform.translation.y, pos.pos.y);
     }
 }
+
+pub fn get_squares_from_pos(position: Vec2) -> [Vec2; 4] {
+    let top_corner_position = Vec2::new(position.x.ceil() - 0.5, position.y.ceil() - 0.5);
+    [
+        top_corner_position,
+        Vec2::new(top_corner_position.x, top_corner_position.y + 1.),
+        Vec2::new(top_corner_position.x + 1., top_corner_position.y),
+        Vec2::new(top_corner_position.x + 1., top_corner_position.y + 1.),
+    ]
+}

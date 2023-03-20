@@ -169,7 +169,9 @@ impl Dead {
                 entity.despawn_recursive();
                 for (bar, parent) in bars.iter() {
                     if bar.target == *dead {
-                        commands.entity(**parent).despawn_recursive();
+                        if let Some(entity) = commands.get_entity(**parent) {
+                            entity.despawn_recursive();
+                        }
                     }
                 }
             }

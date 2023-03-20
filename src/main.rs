@@ -27,17 +27,19 @@ use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
 };
 use controls::{
-    build_on_click, pick_building, remove_highlight, show_highlight, update_under_cursor,
+    build_on_click, remove_highlight, show_highlight, update_under_cursor, SelectedTower,
     UnderCursor,
 };
 use creeps::{CreepSpawner, Dead, Hit, HitPoints, Slow};
+use gui::show_sidebar;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
-use towers::{rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack};
+use towers::{rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickTower, RemoveTower};
 
 mod common;
 mod controls;
 mod creeps;
+mod gui;
 mod progress_bar;
 mod tower_abilities;
 mod towers;
@@ -81,10 +83,13 @@ fn main() {
         .add_state::<Phase>()
         .add_event::<Hit>()
         .add_event::<Dead>()
+        .add_event::<PickTower>()
+        .add_event::<RemoveTower>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
         .init_resource::<BuildGrid>()
+        .init_resource::<SelectedTower>()
         .add_plugin(TowerAbilitiesPlugin)
         .add_startup_system(startup)
         .add_systems((
@@ -109,10 +114,13 @@ fn main() {
             rebuild_navmesh.in_schedule(OnExit(Phase::Pick)),
             uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
             remove_highlight.in_schedule(OnExit(Phase::Build)),
-            pick_building.in_set(OnUpdate(Phase::Pick)),
+            PickTower::pick_building.in_set(OnUpdate(Phase::Pick)),
             next_level.in_schedule(OnExit(Phase::Spawn)),
             Slow::change.in_set(OnUpdate(Phase::Spawn)),
             LaserAttack::update_multiple_targets,
+            show_sidebar,
+            SelectedTower::selection,
+            RemoveTower::remove,
         ))
         .run();
 }
