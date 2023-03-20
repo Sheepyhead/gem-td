@@ -3,7 +3,7 @@ use bevy_egui::EguiContexts;
 
 use crate::{
     controls::SelectedTower,
-    towers::{Dirt, JustBuilt, LaserAttack, PickTower, RemoveTower},
+    towers::{Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RemoveTower, UpgradeAndPick},
     Phase,
 };
 
@@ -11,10 +11,12 @@ pub fn show_sidebar(
     mut contexts: EguiContexts,
     mut pick_events: EventWriter<PickTower>,
     mut remove_events: EventWriter<RemoveTower>,
+    mut upgrade_and_pick_events: EventWriter<UpgradeAndPick>,
     phase: Res<State<Phase>>,
     selected: Res<SelectedTower>,
     names: Query<&Name>,
     towers: Query<&LaserAttack>,
+    just_built_gem_towers: Query<&GemTower, With<JustBuilt>>,
     dirt: Query<(), With<Dirt>>,
     just_built: Query<(), With<JustBuilt>>,
 ) {
@@ -58,6 +60,17 @@ pub fn show_sidebar(
                             };
                             if dirt.contains(selected_tower) && ui.button("Remove").clicked() {
                                 remove_events.send(RemoveTower(selected_tower));
+                            }
+                            if let Ok(tower) = just_built_gem_towers.get(selected_tower) {
+                                if just_built_gem_towers
+                                    .iter()
+                                    .filter(|other_gem_tower| *other_gem_tower == tower)
+                                    .count()
+                                    >= 2
+                                    && ui.button("Combine!").clicked()
+                                {
+                                    upgrade_and_pick_events.send(UpgradeAndPick(selected_tower));
+                                }
                             }
                         }
                         Phase::Build => {

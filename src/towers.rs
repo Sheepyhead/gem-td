@@ -66,11 +66,7 @@ pub fn uncover_dirt(
     just_built: Query<Entity, With<JustBuilt>>,
 ) {
     for entity in &just_built {
-        let mut color: StandardMaterial =
-            Color::rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.5).into();
-        color.alpha_mode = AlphaMode::Add;
-
-        let mut gem_tower = GemTower {
+        let gem_tower = GemTower {
             typ: GemType::random(),
             quality: GemQuality::random(),
         };
@@ -111,7 +107,7 @@ pub fn rebuild_navmesh(
     );
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GemType {
     Emerald,
     Ruby,
@@ -123,7 +119,7 @@ pub enum GemType {
     Topaz,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GemQuality {
     Chipped,
     Flawed,
@@ -183,14 +179,14 @@ impl GemType {
     }
 }
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GemTower {
     typ: GemType,
     quality: GemQuality,
 }
 
 impl GemTower {
-    pub fn add_abilities(&mut self, entity: &mut EntityCommands) {
+    pub fn add_abilities(self, entity: &mut EntityCommands) -> Entity {
         match (self.typ, self.quality) {
             (GemType::Emerald, GemQuality::Chipped) => entity.insert(SlowPoisonOnHit {
                 dps: 2,
@@ -257,7 +253,8 @@ impl GemTower {
                 range: 10.,
             }),
             _ => entity,
-        };
+        }
+        .id()
     }
 
     pub fn get_base_cooldown_time(self) -> f32 {
@@ -274,6 +271,19 @@ impl GemTower {
                 GemQuality::Chipped,
             ) => BASE_TOWER_SPEED - 0.2,
             _ => BASE_TOWER_SPEED,
+        }
+    }
+
+    pub fn get_upgrade(self) -> Self {
+        Self {
+            typ: self.typ,
+            quality: match self.quality {
+                GemQuality::Chipped => GemQuality::Flawed,
+                GemQuality::Flawed => GemQuality::Normal,
+                GemQuality::Normal => GemQuality::Flawless,
+                GemQuality::Flawless => GemQuality::Perfect,
+                GemQuality::Perfect => unimplemented!("Cannot upgrade perfect gems"),
+            },
         }
     }
 }
@@ -693,3 +703,41 @@ impl RemoveTower {
 
 #[derive(Component)]
 pub struct JustBuilt;
+
+pub struct UpgradeAndPick(pub Entity);
+
+impl UpgradeAndPick {
+    pub fn upgrade_and_pick(
+        mut commands: Commands,
+        mut upgrade_events: EventReader<UpgradeAndPick>,
+        mut pick_events: EventWriter<PickTower>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut mats: ResMut<Assets<StandardMaterial>>,
+        towers: Query<(Entity, &GlobalTransform, &GemTower)>,
+    ) {
+        for UpgradeAndPick(entity) in upgrade_events.iter() {
+            if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
+                commands.entity(old_tower).despawn_recursive();
+                let new_tower = tower.get_upgrade();
+                let cooldown: Cooldown = new_tower.into();
+                let new_tower = new_tower.add_abilities(&mut commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                        material: mats.add(new_tower.typ.into()),
+                        transform: tower_pos.compute_transform(),
+                        ..default()
+                    },
+                    new_tower,
+                    Name::new(new_tower.to_string()),
+                    Tower,
+                    LaserAttack::from(new_tower),
+                    cooldown,
+                    Target::Single(None),
+                    SpeedModifiers::default(),
+                    JustBuilt,
+                )));
+                pick_events.send(PickTower(new_tower));
+            }
+        }
+    }
+}
