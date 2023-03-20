@@ -3,7 +3,7 @@ use bevy_egui::EguiContexts;
 
 use crate::{
     controls::SelectedTower,
-    towers::{Dirt, JustBuilt, PickTower, RemoveTower},
+    towers::{Dirt, JustBuilt, LaserAttack, PickTower, RemoveTower},
     Phase,
 };
 
@@ -13,7 +13,8 @@ pub fn show_sidebar(
     mut remove_events: EventWriter<RemoveTower>,
     phase: Res<State<Phase>>,
     selected: Res<SelectedTower>,
-    towers: Query<&Name>,
+    names: Query<&Name>,
+    towers: Query<&LaserAttack>,
     dirt: Query<(), With<Dirt>>,
     just_built: Query<(), With<JustBuilt>>,
 ) {
@@ -31,9 +32,22 @@ pub fn show_sidebar(
                 });
 
                 ui.separator();
+
                 if let Some(selected_tower) = **selected {
-                    if let Ok(name) = towers.get(selected_tower) {
+                    if let Ok(name) = names.get(selected_tower) {
                         ui.label(format!("Selected tower: {name}"));
+                    }
+
+                    if let Ok(LaserAttack {
+                        range,
+                        damage,
+                        hits,
+                        ..
+                    }) = towers.get(selected_tower)
+                    {
+                        ui.label(format!("Range: {range}"));
+                        ui.label(format!("Damage: {damage}"));
+                        ui.label(format!("Targets: {hits}"));
                     }
                     match phase.0 {
                         Phase::Pick => {

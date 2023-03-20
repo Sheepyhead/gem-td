@@ -426,12 +426,26 @@ pub enum Hits {
     All,
 }
 
+impl Display for Hits {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Hits::Ground => "Ground only",
+                Hits::Flying => "Air only",
+                Hits::All => "Everything",
+            }
+        )
+    }
+}
+
 #[derive(Component)]
 pub struct LaserAttack {
-    range: f32,
-    color: Color,
-    damage: Damage,
-    hits: Hits,
+    pub range: f32,
+    pub color: Color,
+    pub damage: Damage,
+    pub hits: Hits,
 }
 
 impl LaserAttack {
@@ -597,6 +611,23 @@ impl Damage {
             Damage::Range(range) => fastrand::u32(range),
             Damage::Fixed(val) => val,
         }
+    }
+}
+
+impl Display for Damage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Range(range) => format!(
+                    "{}-{}",
+                    range.clone().min().unwrap(),
+                    range.clone().max().unwrap()
+                ),
+                Self::Fixed(fixed) => format!("{fixed}"),
+            }
+        )
     }
 }
 
