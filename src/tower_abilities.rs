@@ -1,7 +1,13 @@
-use bevy::prelude::*;
+use std::time::Duration;
+
+use bevy::{
+    prelude::*,
+    utils::{HashMap, HashSet},
+};
 
 use crate::{
     creeps::{Dead, Hit, HitPoints, Slow, SlowSource},
+    towers::{Cooldown, GemTower, Tower},
     Phase,
 };
 
@@ -18,6 +24,10 @@ impl Plugin for TowerAbilitiesPlugin {
             SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
             CritOnHit::crit.in_set(OnUpdate(Phase::Spawn)),
             SplashOnHit::splash.in_set(OnUpdate(Phase::Spawn)),
+            Aura::aura_tower_added,
+            Aura::aura_tower_removed,
+            Aura::tower_added,
+            SpeedModifiers::update,
         ));
     }
 }
@@ -224,6 +234,125 @@ impl SplashOnHit {
                     }
                 }
             }
+        }
+    }
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, Copy)]
+pub enum AuraType {
+    Opal(u32),
+}
+
+#[derive(Component)]
+pub struct Aura {
+    pub typ: AuraType,
+    pub range: f32,
+}
+
+impl Aura {
+    fn aura_tower_added(
+        aura_changed: Query<(), Changed<Aura>>,
+        auras: Query<(&GlobalTransform, &Aura)>,
+        mut towers: Query<(Entity, &GlobalTransform, &mut SpeedModifiers)>,
+    ) {
+        if !aura_changed.is_empty() {
+            // New aura tower has been added, recalculate
+            Self::reapply_auras(&mut towers, auras.iter());
+            println!("New aura tower!");
+        }
+    }
+
+    fn aura_tower_removed(
+        removed: RemovedComponents<Aura>,
+        auras: Query<(&GlobalTransform, &Aura)>,
+        mut towers: Query<(Entity, &GlobalTransform, &mut SpeedModifiers)>,
+    ) {
+        if !removed.is_empty() {
+            // Existing aura tower has been removed, recalculate
+            Self::reapply_auras(&mut towers, auras.iter());
+            println!("Removed aura tower!");
+        }
+    }
+
+    fn tower_added(
+        tower_added: Query<(), (Added<Tower>, Without<Aura>)>,
+        auras: Query<(&GlobalTransform, &Aura)>,
+        mut towers: Query<(Entity, &GlobalTransform, &mut SpeedModifiers)>,
+    ) {
+        if !tower_added.is_empty() {
+            // New tower has been added, recalculate
+            Self::reapply_auras(&mut towers, auras.iter());
+            println!("New non-aura tower!");
+        }
+    }
+
+    fn reapply_auras<'a>(
+        towers: &mut Query<(Entity, &GlobalTransform, &mut SpeedModifiers)>,
+        auras: impl Iterator<Item = (&'a GlobalTransform, &'a Aura)>,
+    ) {
+        let mut strongest_auras: HashSet<(Entity, AuraType)> = HashSet::default();
+        for (aura_pos, aura) in auras {
+            for (tower, tower_pos, _) in towers.iter() {
+                if aura_pos
+                    .translation()
+                    .distance_squared(tower_pos.translation())
+                    <= aura.range.powf(2.)
+                {
+                    // Tower is within range of aura
+                    if let Some((entity, existing_aura)) = strongest_auras.get(&(tower, aura.typ)) {
+                        // Tower is already affected by an aura of this type
+                        #[allow(irrefutable_let_patterns)]
+                        if let (AuraType::Opal(existing_value), AuraType::Opal(new_value)) =
+                            (existing_aura, aura.typ)
+                        {
+                            // Test if the new value is bigger than the old
+                            if *existing_value < new_value {
+                                strongest_auras.insert((*entity, AuraType::Opal(new_value)));
+                            }
+                        }
+                    } else {
+                        // Tower is not yet affected by an aura of this type
+                        strongest_auras.insert((tower, aura.typ));
+                    }
+                }
+            }
+        }
+        // Apply auras
+        for (tower, aura) in strongest_auras {
+            match aura {
+                AuraType::Opal(modifier) => {
+                    if let Ok((_, _, mut modifiers)) = towers.get_mut(tower) {
+                        modifiers.insert(SpeedModifierType::OpalAura, modifier);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component, Default, Deref, DerefMut)]
+pub struct SpeedModifiers(HashMap<SpeedModifierType, u32>);
+
+#[derive(Eq, Hash, PartialEq)]
+pub enum SpeedModifierType {
+    OpalAura,
+}
+
+impl SpeedModifiers {
+    fn update(
+        mut modifiers: Query<(&GemTower, &mut Cooldown, &SpeedModifiers), Changed<SpeedModifiers>>,
+    ) {
+        for (tower, mut cooldown, modifiers) in &mut modifiers {
+            println!("Speed modifier changed for tower {tower:?}");
+            // Make a cooldown timer that starts in a finished state
+            let base_time = tower.get_base_cooldown_time();
+            let mut time = base_time;
+            for modifier in modifiers.values() {
+                time -= base_time * (*modifier as f32 / 100.);
+            }
+            let mut timer = Timer::from_seconds(time, TimerMode::Once);
+            timer.tick(Duration::from_secs_f32(time));
+            *cooldown = Cooldown(timer);
         }
     }
 }

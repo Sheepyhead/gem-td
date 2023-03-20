@@ -14,7 +14,9 @@ use seldom_map_nav::prelude::*;
 
 use crate::{
     creeps::{Creep, CreepType, Hit, HitPoints},
-    tower_abilities::{CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit, SplashOnHit},
+    tower_abilities::{
+        Aura, AuraType, CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit, SpeedModifiers, SplashOnHit,
+    },
     CREEP_CLEARANCE, MAP_HEIGHT, MAP_WIDTH,
 };
 
@@ -80,6 +82,7 @@ pub fn uncover_dirt(
             LaserAttack::from(gem_tower),
             cooldown,
             Target::Single(None),
+            SpeedModifiers::default(),
         )));
     }
 }
@@ -106,7 +109,7 @@ pub fn rebuild_navmesh(
     );
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum GemType {
     Emerald,
     Ruby,
@@ -118,7 +121,7 @@ pub enum GemType {
     Topaz,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum GemQuality {
     Chipped,
     Flawed,
@@ -155,7 +158,7 @@ impl From<GemType> for Color {
             GemType::Sapphire => Color::BLUE,
             GemType::Diamond => Color::WHITE,
             GemType::Amethyst => Color::PURPLE,
-            GemType::Opal => Color::FUCHSIA,
+            GemType::Opal => Color::ORANGE,
             GemType::Aquamarine => Color::SEA_GREEN,
             GemType::Topaz => Color::YELLOW,
         }
@@ -178,7 +181,7 @@ impl GemType {
     }
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, Debug)]
 pub struct GemTower {
     typ: GemType,
     quality: GemQuality,
@@ -231,8 +234,45 @@ impl GemTower {
                 multiplier: 0.5,
                 range: 3.,
             }),
+            (GemType::Opal, GemQuality::Chipped) => entity.insert(Aura {
+                typ: AuraType::Opal(10),
+                range: 6.,
+            }),
+            (GemType::Opal, GemQuality::Flawed) => entity.insert(Aura {
+                typ: AuraType::Opal(15),
+                range: 7.,
+            }),
+            (GemType::Opal, GemQuality::Normal) => entity.insert(Aura {
+                typ: AuraType::Opal(20),
+                range: 8.,
+            }),
+            (GemType::Opal, GemQuality::Flawless) => entity.insert(Aura {
+                typ: AuraType::Opal(25),
+                range: 9.,
+            }),
+            (GemType::Opal, GemQuality::Perfect) => entity.insert(Aura {
+                typ: AuraType::Opal(35),
+                range: 10.,
+            }),
             _ => entity,
         };
+    }
+
+    pub fn get_base_cooldown_time(self) -> f32 {
+        match (self.typ, self.quality) {
+            (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
+            (
+                GemType::Topaz
+                | GemType::Amethyst
+                | GemType::Emerald
+                | GemType::Ruby
+                | GemType::Sapphire
+                | GemType::Diamond
+                | GemType::Opal,
+                GemQuality::Chipped,
+            ) => BASE_TOWER_SPEED - 0.2,
+            _ => BASE_TOWER_SPEED,
+        }
     }
 }
 
@@ -355,20 +395,7 @@ impl From<GemTower> for LaserAttack {
 impl From<GemTower> for Cooldown {
     fn from(value: GemTower) -> Self {
         // Make a cooldown timer that starts in a finished state
-        let time = match (value.typ, value.quality) {
-            (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
-            (
-                GemType::Topaz
-                | GemType::Amethyst
-                | GemType::Emerald
-                | GemType::Ruby
-                | GemType::Sapphire
-                | GemType::Diamond
-                | GemType::Opal,
-                GemQuality::Chipped,
-            ) => BASE_TOWER_SPEED - 0.2,
-            _ => BASE_TOWER_SPEED,
-        };
+        let time = value.get_base_cooldown_time();
         let mut timer = Timer::from_seconds(time, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(time));
 
