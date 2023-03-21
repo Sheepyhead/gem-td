@@ -1,10 +1,7 @@
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     math::Vec3Swizzles,
-    prelude::{
-        shape::{Cube, Plane},
-        *,
-    },
+    prelude::{shape::Plane, *},
     utils::HashSet,
 };
 use bevy_rapier3d::prelude::*;
@@ -178,9 +175,9 @@ pub fn build_on_click(
                 color.alpha_mode = AlphaMode::Add;
                 commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
+                        mesh: meshes.add(Tower::Dirt.into()),
                         material: mats.add(Color::ORANGE_RED.into()),
-                        transform: Transform::from_translation(pos),
+                        transform: Transform::from_xyz(pos.x, Tower::Dirt.get_y_offset(), pos.z),
                         ..default()
                     },
                     JustBuilt,

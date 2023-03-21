@@ -4,12 +4,7 @@ use std::{
     time::Duration,
 };
 
-use bevy::{
-    ecs::system::EntityCommands,
-    math::Vec3Swizzles,
-    prelude::{shape::Cube, *},
-    utils::HashSet,
-};
+use bevy::{ecs::system::EntityCommands, math::Vec3Swizzles, prelude::*, utils::HashSet};
 use bevy_prototype_debug_lines::DebugLines;
 use seldom_map_nav::prelude::*;
 
@@ -58,9 +53,9 @@ pub fn uncover_dirt(
     mut mats: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     random_level: Res<RandomLevel>,
-    just_built: Query<Entity, With<JustBuilt>>,
+    just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
 ) {
-    for entity in &just_built {
+    for (entity, pos) in &just_built {
         let typ = GemType::random();
         let gem_tower = Tower::GemTower {
             typ,
@@ -68,7 +63,12 @@ pub fn uncover_dirt(
         };
         let cooldown: Cooldown = gem_tower.into();
         gem_tower.add_abilities(commands.entity(entity).insert((
-            meshes.add(Into::<Cube>::into(gem_tower).into()),
+            meshes.add(gem_tower.into()),
+            Transform::from_xyz(
+                pos.compute_transform().translation.x,
+                gem_tower.get_y_offset(),
+                pos.compute_transform().translation.z,
+            ),
             mats.add(typ.into()),
             gem_tower,
             Name::new(gem_tower.to_string()),
@@ -291,6 +291,19 @@ impl Tower {
             Tower::Dirt => self,
         }
     }
+
+    pub fn get_y_offset(self) -> f32 {
+        match self {
+            Tower::GemTower { quality, .. } => match quality {
+                GemQuality::Chipped => 0.2,
+                GemQuality::Flawed => 0.4,
+                GemQuality::Normal => 0.6,
+                GemQuality::Flawless => 0.8,
+                GemQuality::Perfect => 1.,
+            },
+            Tower::Dirt => 0.,
+        }
+    }
 }
 
 impl Display for Tower {
@@ -426,19 +439,28 @@ impl From<Tower> for Cooldown {
     }
 }
 
-impl From<Tower> for shape::Cube {
+impl From<Tower> for Mesh {
     fn from(value: Tower) -> Self {
-        shape::Cube {
-            size: match value {
-                Tower::GemTower { quality, .. } => match quality {
+        match value {
+            Tower::GemTower { quality, .. } => shape::Cube {
+                size: match quality {
                     GemQuality::Chipped => 0.4,
                     GemQuality::Flawed => 0.8,
                     GemQuality::Normal => 1.2,
                     GemQuality::Flawless => 1.6,
                     GemQuality::Perfect => 2.0,
                 },
-                Tower::Dirt => 2.,
-            },
+            }
+            .into(),
+            Tower::Dirt => shape::Box {
+                min_x: -1.,
+                max_x: 1.,
+                min_y: 0.,
+                max_y: 0.2,
+                min_z: -1.,
+                max_z: 1.,
+            }
+            .into(),
         }
     }
 }
@@ -674,9 +696,13 @@ impl PickTower {
                     commands.entity(entity).despawn_recursive();
                     commands.spawn((
                         PbrBundle {
-                            mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
+                            mesh: meshes.add(Tower::Dirt.into()),
                             material: mats.add(Color::ORANGE_RED.into()),
-                            transform: transform.compute_transform(),
+                            transform: Transform::from_xyz(
+                                transform.compute_transform().translation.x,
+                                Tower::Dirt.get_y_offset(),
+                                transform.compute_transform().translation.z,
+                            ),
                             ..default()
                         },
                         Name::new("Dirt"),
@@ -737,9 +763,13 @@ impl UpgradeAndPick {
                         let cooldown: Cooldown = new_tower.into();
                         let new_tower = new_tower.add_abilities(&mut commands.spawn((
                             PbrBundle {
-                                mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                                mesh: meshes.add(new_tower.into()),
                                 material: mats.add(typ.into()),
-                                transform: tower_pos.compute_transform(),
+                                transform: Transform::from_xyz(
+                                    tower_pos.compute_transform().translation.x,
+                                    new_tower.get_y_offset(),
+                                    tower_pos.compute_transform().translation.z,
+                                ),
                                 ..default()
                             },
                             Name::new(new_tower.to_string()),
@@ -781,9 +811,13 @@ impl Upgrade {
                         let cooldown: Cooldown = new_tower.into();
                         new_tower.add_abilities(&mut commands.spawn((
                             PbrBundle {
-                                mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                                mesh: meshes.add(new_tower.into()),
                                 material: mats.add(Into::<Color>::into(*typ).into()),
-                                transform: tower_pos.compute_transform(),
+                                transform: Transform::from_xyz(
+                                    tower_pos.compute_transform().translation.x,
+                                    new_tower.get_y_offset(),
+                                    tower_pos.compute_transform().translation.z,
+                                ),
                                 ..default()
                             },
                             new_tower,
@@ -801,9 +835,13 @@ impl Upgrade {
                             commands.entity(remove_tower).despawn_recursive();
                             commands.spawn((
                                 PbrBundle {
-                                    mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
+                                    mesh: meshes.add(Tower::Dirt.into()),
                                     material: mats.add(Color::ORANGE_RED.into()),
-                                    transform: remove_tower_pos.compute_transform(),
+                                    transform: Transform::from_xyz(
+                                        remove_tower_pos.compute_transform().translation.x,
+                                        Tower::Dirt.get_y_offset(),
+                                        remove_tower_pos.compute_transform().translation.z,
+                                    ),
                                     ..default()
                                 },
                                 Name::new("Dirt"),
