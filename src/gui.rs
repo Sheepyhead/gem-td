@@ -4,8 +4,8 @@ use bevy_egui::EguiContexts;
 use crate::{
     controls::SelectedTower,
     towers::{
-        Cooldown, Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower,
-        Upgrade, UpgradeAndPick,
+        Cooldown, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower, Tower, Upgrade,
+        UpgradeAndPick,
     },
     Phase,
 };
@@ -21,9 +21,8 @@ pub fn show_sidebar(
     selected: Res<SelectedTower>,
     names: Query<&Name>,
     tower_stats: Query<(&LaserAttack, &Cooldown)>,
-    just_built_gem_towers: Query<&GemTower, With<JustBuilt>>,
-    gem_towers: Query<&GemTower, Without<JustBuilt>>,
-    dirt: Query<(), With<Dirt>>,
+    just_built_towers: Query<&Tower, With<JustBuilt>>,
+    towers: Query<&Tower, Without<JustBuilt>>,
     just_built: Query<(), With<JustBuilt>>,
 ) {
     let ctx = contexts.ctx_mut();
@@ -68,13 +67,27 @@ pub fn show_sidebar(
                             {
                                 pick_events.send(PickTower(selected_tower));
                             };
-                            if dirt.contains(selected_tower) && ui.button("Remove").clicked() {
-                                remove_events.send(RemoveTower(selected_tower));
+                            if let Ok(Tower::Dirt) = towers.get(selected_tower) {
+                                if ui.button("Remove").clicked() {
+                                    remove_events.send(RemoveTower(selected_tower));
+                                }
                             }
-                            if let Ok(tower) = just_built_gem_towers.get(selected_tower) {
-                                if just_built_gem_towers
+                            if let Ok(Tower::GemTower { typ, quality }) =
+                                just_built_towers.get(selected_tower)
+                            {
+                                if just_built_towers
                                     .iter()
-                                    .filter(|other_gem_tower| *other_gem_tower == tower)
+                                    .filter(|other_gem_tower| {
+                                        if let Tower::GemTower { .. } = other_gem_tower {
+                                            **other_gem_tower
+                                                == Tower::GemTower {
+                                                    typ: *typ,
+                                                    quality: *quality,
+                                                }
+                                        } else {
+                                            false
+                                        }
+                                    })
                                     .count()
                                     >= 2
                                     && ui.button("Combine!").clicked()
@@ -84,15 +97,23 @@ pub fn show_sidebar(
                             }
                         }
                         Phase::Build => {
-                            if dirt.contains(selected_tower) && ui.button("Remove").clicked() {
-                                remove_events.send(RemoveTower(selected_tower));
+                            if let Ok(Tower::Dirt) = towers.get(selected_tower) {
+                                if ui.button("Remove").clicked() {
+                                    remove_events.send(RemoveTower(selected_tower));
+                                }
                             }
                         }
                         Phase::Spawn => {
-                            if let Ok(tower) = gem_towers.get(selected_tower) {
-                                if gem_towers
+                            if let Ok(tower) = towers.get(selected_tower) {
+                                if towers
                                     .iter()
-                                    .filter(|other_gem_tower| *other_gem_tower == tower)
+                                    .filter(|other_gem_tower| {
+                                        if let Tower::GemTower { .. } = other_gem_tower {
+                                            *other_gem_tower == tower
+                                        } else {
+                                            false
+                                        }
+                                    })
                                     .count()
                                     >= 2
                                     && ui.button("Combine!").clicked()

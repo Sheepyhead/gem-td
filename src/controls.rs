@@ -178,13 +178,13 @@ pub fn build_on_click(
                 color.alpha_mode = AlphaMode::Add;
                 commands.spawn((
                     PbrBundle {
-                        mesh: meshes.add(Cube { size: 2.0 }.into()),
+                        mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
                         material: mats.add(Color::ORANGE_RED.into()),
                         transform: Transform::from_translation(pos),
                         ..default()
                     },
                     JustBuilt,
-                    Tower,
+                    Tower::Dirt,
                 ));
 
                 **builds -= 1;

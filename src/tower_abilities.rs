@@ -7,7 +7,7 @@ use bevy::{
 
 use crate::{
     creeps::{Dead, Hit, HitPoints, Slow, SlowSource},
-    towers::{Cooldown, GemTower, Tower},
+    towers::{Cooldown, Tower},
     Phase,
 };
 
@@ -340,7 +340,7 @@ pub enum SpeedModifierType {
 
 impl SpeedModifiers {
     fn update(
-        mut modifiers: Query<(&GemTower, &mut Cooldown, &SpeedModifiers), Changed<SpeedModifiers>>,
+        mut modifiers: Query<(&Tower, &mut Cooldown, &SpeedModifiers), Changed<SpeedModifiers>>,
     ) {
         for (tower, mut cooldown, modifiers) in &mut modifiers {
             println!("Speed modifier changed for tower {tower:?}");

@@ -24,12 +24,6 @@ use crate::{
 
 pub const BASE_TOWER_SPEED: f32 = 1.0;
 
-#[derive(Component)]
-pub struct Tower;
-
-#[derive(Component)]
-pub struct Dirt;
-
 #[derive(Component, Clone)]
 pub enum Target {
     Single(Option<Entity>),
@@ -67,17 +61,17 @@ pub fn uncover_dirt(
     just_built: Query<Entity, With<JustBuilt>>,
 ) {
     for entity in &just_built {
-        let gem_tower = GemTower {
-            typ: GemType::random(),
+        let typ = GemType::random();
+        let gem_tower = Tower::GemTower {
+            typ,
             quality: GemQuality::random_with_modifier(**random_level),
         };
         let cooldown: Cooldown = gem_tower.into();
         gem_tower.add_abilities(commands.entity(entity).insert((
             meshes.add(Into::<Cube>::into(gem_tower).into()),
-            mats.add(gem_tower.typ.into()),
+            mats.add(typ.into()),
             gem_tower,
             Name::new(gem_tower.to_string()),
-            Tower,
             LaserAttack::from(gem_tower),
             cooldown,
             Target::Single(None),
@@ -182,232 +176,247 @@ impl GemType {
 }
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GemTower {
-    typ: GemType,
-    quality: GemQuality,
+pub enum Tower {
+    GemTower { typ: GemType, quality: GemQuality },
+    Dirt,
 }
 
-impl GemTower {
+impl Tower {
     pub fn add_abilities(self, entity: &mut EntityCommands) -> Entity {
-        match (self.typ, self.quality) {
-            (GemType::Emerald, GemQuality::Chipped) => entity.insert(SlowPoisonOnHit {
-                dps: 2,
-                slow: 15,
-                duration: 3.,
-            }),
-            (GemType::Emerald, GemQuality::Flawed) => entity.insert(SlowPoisonOnHit {
-                dps: 3,
-                slow: 20,
-                duration: 4.,
-            }),
-            (GemType::Emerald, GemQuality::Normal) => entity.insert(SlowPoisonOnHit {
-                dps: 5,
-                slow: 25,
-                duration: 5.,
-            }),
-            (GemType::Emerald, GemQuality::Flawless) => entity.insert(SlowPoisonOnHit {
-                dps: 8,
-                slow: 30,
-                duration: 6.,
-            }),
-            (GemType::Emerald, GemQuality::Perfect) => entity.insert(SlowPoisonOnHit {
-                dps: 16,
-                slow: 50,
-                duration: 8.,
-            }),
-            (GemType::Sapphire, quality) => entity.insert(SapphireSlowOnHit {
-                slow: match quality {
-                    GemQuality::Chipped => 20,
-                    GemQuality::Flawed => 25,
-                    GemQuality::Normal => 30,
-                    GemQuality::Flawless => 35,
-                    GemQuality::Perfect => 40,
-                },
-            }),
-            (GemType::Diamond, ..) => entity.insert(CritOnHit),
-            (GemType::Topaz, ..) => entity.insert(Target::Multiple(vec![])),
-            (GemType::Ruby, GemQuality::Perfect) => entity.insert(SplashOnHit {
-                multiplier: 0.5,
-                range: 3.5,
-            }),
-            (GemType::Ruby, ..) => entity.insert(SplashOnHit {
-                multiplier: 0.5,
-                range: 3.,
-            }),
-            (GemType::Opal, GemQuality::Chipped) => entity.insert(Aura {
-                typ: AuraType::Opal(10),
-                range: 8.,
-            }),
-            (GemType::Opal, GemQuality::Flawed) => entity.insert(Aura {
-                typ: AuraType::Opal(15),
-                range: 9.,
-            }),
-            (GemType::Opal, GemQuality::Normal) => entity.insert(Aura {
-                typ: AuraType::Opal(20),
-                range: 10.,
-            }),
-            (GemType::Opal, GemQuality::Flawless) => entity.insert(Aura {
-                typ: AuraType::Opal(25),
-                range: 11.,
-            }),
-            (GemType::Opal, GemQuality::Perfect) => entity.insert(Aura {
-                typ: AuraType::Opal(35),
-                range: 12.,
-            }),
-            _ => entity,
+        match self {
+            Self::GemTower { typ, quality } => match (typ, quality) {
+                (GemType::Emerald, GemQuality::Chipped) => entity.insert(SlowPoisonOnHit {
+                    dps: 2,
+                    slow: 15,
+                    duration: 3.,
+                }),
+                (GemType::Emerald, GemQuality::Flawed) => entity.insert(SlowPoisonOnHit {
+                    dps: 3,
+                    slow: 20,
+                    duration: 4.,
+                }),
+                (GemType::Emerald, GemQuality::Normal) => entity.insert(SlowPoisonOnHit {
+                    dps: 5,
+                    slow: 25,
+                    duration: 5.,
+                }),
+                (GemType::Emerald, GemQuality::Flawless) => entity.insert(SlowPoisonOnHit {
+                    dps: 8,
+                    slow: 30,
+                    duration: 6.,
+                }),
+                (GemType::Emerald, GemQuality::Perfect) => entity.insert(SlowPoisonOnHit {
+                    dps: 16,
+                    slow: 50,
+                    duration: 8.,
+                }),
+                (GemType::Sapphire, quality) => entity.insert(SapphireSlowOnHit {
+                    slow: match quality {
+                        GemQuality::Chipped => 20,
+                        GemQuality::Flawed => 25,
+                        GemQuality::Normal => 30,
+                        GemQuality::Flawless => 35,
+                        GemQuality::Perfect => 40,
+                    },
+                }),
+                (GemType::Diamond, ..) => entity.insert(CritOnHit),
+                (GemType::Topaz, ..) => entity.insert(Target::Multiple(vec![])),
+                (GemType::Ruby, GemQuality::Perfect) => entity.insert(SplashOnHit {
+                    multiplier: 0.5,
+                    range: 3.5,
+                }),
+                (GemType::Ruby, ..) => entity.insert(SplashOnHit {
+                    multiplier: 0.5,
+                    range: 3.,
+                }),
+                (GemType::Opal, GemQuality::Chipped) => entity.insert(Aura {
+                    typ: AuraType::Opal(10),
+                    range: 8.,
+                }),
+                (GemType::Opal, GemQuality::Flawed) => entity.insert(Aura {
+                    typ: AuraType::Opal(15),
+                    range: 9.,
+                }),
+                (GemType::Opal, GemQuality::Normal) => entity.insert(Aura {
+                    typ: AuraType::Opal(20),
+                    range: 10.,
+                }),
+                (GemType::Opal, GemQuality::Flawless) => entity.insert(Aura {
+                    typ: AuraType::Opal(25),
+                    range: 11.,
+                }),
+                (GemType::Opal, GemQuality::Perfect) => entity.insert(Aura {
+                    typ: AuraType::Opal(35),
+                    range: 12.,
+                }),
+                _ => entity,
+            },
+            Tower::Dirt => entity,
         }
         .id()
     }
 
     pub fn get_base_cooldown_time(self) -> f32 {
-        match (self.typ, self.quality) {
-            (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
-            (
-                GemType::Topaz
-                | GemType::Amethyst
-                | GemType::Emerald
-                | GemType::Ruby
-                | GemType::Sapphire
-                | GemType::Diamond
-                | GemType::Opal,
-                GemQuality::Chipped,
-            ) => BASE_TOWER_SPEED - 0.2,
-            _ => BASE_TOWER_SPEED,
+        match self {
+            Tower::GemTower { typ, quality } => match (typ, quality) {
+                (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
+                (
+                    GemType::Topaz
+                    | GemType::Amethyst
+                    | GemType::Emerald
+                    | GemType::Ruby
+                    | GemType::Sapphire
+                    | GemType::Diamond
+                    | GemType::Opal,
+                    GemQuality::Chipped,
+                ) => BASE_TOWER_SPEED - 0.2,
+                _ => BASE_TOWER_SPEED,
+            },
+            Tower::Dirt => BASE_TOWER_SPEED,
         }
     }
 
     pub fn get_upgrade(self) -> Self {
-        Self {
-            typ: self.typ,
-            quality: match self.quality {
-                GemQuality::Chipped => GemQuality::Flawed,
-                GemQuality::Flawed => GemQuality::Normal,
-                GemQuality::Normal => GemQuality::Flawless,
-                GemQuality::Flawless => GemQuality::Perfect,
-                GemQuality::Perfect => unimplemented!("Cannot upgrade perfect gems"),
+        match self {
+            Tower::GemTower { typ, quality } => Self::GemTower {
+                typ,
+                quality: match quality {
+                    GemQuality::Chipped => GemQuality::Flawed,
+                    GemQuality::Flawed => GemQuality::Normal,
+                    GemQuality::Normal => GemQuality::Flawless,
+                    GemQuality::Flawless => GemQuality::Perfect,
+                    GemQuality::Perfect => unimplemented!("Cannot upgrade perfect gems"),
+                },
             },
+            Tower::Dirt => self,
         }
     }
 }
 
-impl Display for GemTower {
+impl Display for Tower {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}",
-            match self.quality {
-                GemQuality::Chipped => "Chipped ",
-                GemQuality::Flawed => "Flawed ",
-                GemQuality::Normal => "",
-                GemQuality::Flawless => "Flawless ",
-                GemQuality::Perfect => "Perfect ",
-            },
-            match self.typ {
-                GemType::Emerald => "Emerald",
-                GemType::Ruby => "Ruby",
-                GemType::Sapphire => "Sapphire",
-                GemType::Diamond => "Diamond",
-                GemType::Amethyst => "Amethyst",
-                GemType::Opal => "Opal",
-                GemType::Aquamarine => "Aquamarine",
-                GemType::Topaz => "Topaz",
-            }
-        )
-    }
-}
-
-impl From<GemTower> for LaserAttack {
-    #[allow(clippy::match_same_arms)]
-    fn from(value: GemTower) -> Self {
-        Self {
-            range: match (value.typ, value.quality) {
-                (GemType::Emerald, GemQuality::Chipped) => 5.,
-                (GemType::Emerald, GemQuality::Flawed) => 5.5,
-                (GemType::Emerald, GemQuality::Normal) => 6.,
-                (GemType::Emerald, GemQuality::Flawless) => 7.,
-                (GemType::Emerald, GemQuality::Perfect) => 7.,
-                (GemType::Ruby, _) => 8.,
-                (GemType::Sapphire, GemQuality::Chipped) => 5.5,
-                (GemType::Sapphire, GemQuality::Flawed) => 7.5,
-                (GemType::Sapphire, GemQuality::Normal) => 8.,
-                (GemType::Sapphire, GemQuality::Flawless) => 8.5,
-                (GemType::Sapphire, GemQuality::Perfect) => 14.,
-                (GemType::Diamond, GemQuality::Chipped) => 5.,
-                (GemType::Diamond, GemQuality::Flawed) => 5.5,
-                (GemType::Diamond, GemQuality::Normal) => 6.,
-                (GemType::Diamond, GemQuality::Flawless) => 6.5,
-                (GemType::Diamond, GemQuality::Perfect) => 7.5,
-                (GemType::Amethyst, GemQuality::Chipped) => 10.,
-                (GemType::Amethyst, GemQuality::Flawed) => 12.,
-                (GemType::Amethyst, GemQuality::Normal) => 13.,
-                (GemType::Amethyst, GemQuality::Flawless) => 13.5,
-                (GemType::Amethyst, GemQuality::Perfect) => 16.,
-                (GemType::Opal, GemQuality::Chipped) => 6.,
-                (GemType::Opal, GemQuality::Flawed) => 7.,
-                (GemType::Opal, GemQuality::Normal) => 8.,
-                (GemType::Opal, GemQuality::Flawless) => 9.,
-                (GemType::Opal, GemQuality::Perfect) => 10.,
-                (GemType::Aquamarine, GemQuality::Chipped) => 3.5,
-                (GemType::Aquamarine, GemQuality::Flawed) => 3.65,
-                (GemType::Aquamarine, GemQuality::Normal) => 3.8,
-                (GemType::Aquamarine, GemQuality::Flawless) => 4.,
-                (GemType::Aquamarine, GemQuality::Perfect) => 5.5,
-                (GemType::Topaz, _) => 5.,
-            },
-            color: value.typ.into(),
-            damage: match (value.typ, value.quality) {
-                (GemType::Emerald, GemQuality::Chipped) => Damage::Range(4..=7),
-                (GemType::Emerald, GemQuality::Flawed) => Damage::Range(10..=13),
-                (GemType::Emerald, GemQuality::Normal) => Damage::Range(15..=25),
-                (GemType::Emerald, GemQuality::Flawless) => Damage::Range(30..=37),
-                (GemType::Emerald, GemQuality::Perfect) => Damage::Range(80..=95),
-                (GemType::Ruby, GemQuality::Chipped) => Damage::Range(8..=9),
-                (GemType::Ruby, GemQuality::Flawed) => Damage::Range(13..=16),
-                (GemType::Ruby, GemQuality::Normal) => Damage::Range(20..=25),
-                (GemType::Ruby, GemQuality::Flawless) => Damage::Range(38..=45),
-                (GemType::Ruby, GemQuality::Perfect) => Damage::Range(80..=100),
-                (GemType::Sapphire, GemQuality::Chipped) => Damage::Range(5..=8),
-                (GemType::Sapphire, GemQuality::Flawed) => Damage::Range(10..=14),
-                (GemType::Sapphire, GemQuality::Normal) => Damage::Range(16..=22),
-                (GemType::Sapphire, GemQuality::Flawless) => Damage::Range(30..=40),
-                (GemType::Sapphire, GemQuality::Perfect) => Damage::Range(60..=80),
-                (GemType::Diamond, GemQuality::Chipped) => Damage::Range(8..=12),
-                (GemType::Diamond, GemQuality::Flawed) => Damage::Range(16..=18),
-                (GemType::Diamond, GemQuality::Normal) => Damage::Range(30..=37),
-                (GemType::Diamond, GemQuality::Flawless) => Damage::Range(58..=65),
-                (GemType::Diamond, GemQuality::Perfect) => Damage::Range(140..=150),
-                (GemType::Amethyst, GemQuality::Chipped) => Damage::Range(10..=15),
-                (GemType::Amethyst, GemQuality::Flawed) => Damage::Range(20..=27),
-                (GemType::Amethyst, GemQuality::Normal) => Damage::Range(30..=45),
-                (GemType::Amethyst, GemQuality::Flawless) => Damage::Range(60..=80),
-                (GemType::Amethyst, GemQuality::Perfect) => Damage::Range(140..=170),
-                (GemType::Opal, GemQuality::Chipped) => Damage::Fixed(5),
-                (GemType::Opal, GemQuality::Flawed) => Damage::Fixed(10),
-                (GemType::Opal, GemQuality::Normal) => Damage::Fixed(20),
-                (GemType::Opal, GemQuality::Flawless) => Damage::Fixed(40),
-                (GemType::Opal, GemQuality::Perfect) => Damage::Fixed(85),
-                (GemType::Aquamarine, GemQuality::Chipped) => Damage::Range(6..=8),
-                (GemType::Aquamarine, GemQuality::Flawed) => Damage::Range(12..=15),
-                (GemType::Aquamarine, GemQuality::Normal) => Damage::Range(24..=30),
-                (GemType::Aquamarine, GemQuality::Flawless) => Damage::Range(48..=55),
-                (GemType::Aquamarine, GemQuality::Perfect) => Damage::Range(100..=120),
-                (GemType::Topaz, GemQuality::Chipped) => Damage::Fixed(4),
-                (GemType::Topaz, GemQuality::Flawed) => Damage::Fixed(8),
-                (GemType::Topaz, GemQuality::Normal) => Damage::Fixed(14),
-                (GemType::Topaz, GemQuality::Flawless) => Damage::Fixed(25),
-                (GemType::Topaz, GemQuality::Perfect) => Damage::Fixed(75),
-            },
-            hits: match value.typ {
-                GemType::Ruby => Hits::Ground,
-                GemType::Amethyst => Hits::Flying,
-                _ => Hits::All,
-            },
+        match self {
+            Tower::GemTower { typ, quality } => write!(
+                f,
+                "{}{}",
+                match quality {
+                    GemQuality::Chipped => "Chipped ",
+                    GemQuality::Flawed => "Flawed ",
+                    GemQuality::Normal => "",
+                    GemQuality::Flawless => "Flawless ",
+                    GemQuality::Perfect => "Perfect ",
+                },
+                match typ {
+                    GemType::Emerald => "Emerald",
+                    GemType::Ruby => "Ruby",
+                    GemType::Sapphire => "Sapphire",
+                    GemType::Diamond => "Diamond",
+                    GemType::Amethyst => "Amethyst",
+                    GemType::Opal => "Opal",
+                    GemType::Aquamarine => "Aquamarine",
+                    GemType::Topaz => "Topaz",
+                }
+            ),
+            Tower::Dirt => write!(f, "Dirt"),
         }
     }
 }
 
-impl From<GemTower> for Cooldown {
-    fn from(value: GemTower) -> Self {
+impl From<Tower> for LaserAttack {
+    #[allow(clippy::match_same_arms)]
+    fn from(value: Tower) -> Self {
+        match value {
+            Tower::GemTower { typ, quality } => Self {
+                range: match (typ, quality) {
+                    (GemType::Emerald, GemQuality::Chipped) => 5.,
+                    (GemType::Emerald, GemQuality::Flawed) => 5.5,
+                    (GemType::Emerald, GemQuality::Normal) => 6.,
+                    (GemType::Emerald, GemQuality::Flawless) => 7.,
+                    (GemType::Emerald, GemQuality::Perfect) => 7.,
+                    (GemType::Ruby, _) => 8.,
+                    (GemType::Sapphire, GemQuality::Chipped) => 5.5,
+                    (GemType::Sapphire, GemQuality::Flawed) => 7.5,
+                    (GemType::Sapphire, GemQuality::Normal) => 8.,
+                    (GemType::Sapphire, GemQuality::Flawless) => 8.5,
+                    (GemType::Sapphire, GemQuality::Perfect) => 14.,
+                    (GemType::Diamond, GemQuality::Chipped) => 5.,
+                    (GemType::Diamond, GemQuality::Flawed) => 5.5,
+                    (GemType::Diamond, GemQuality::Normal) => 6.,
+                    (GemType::Diamond, GemQuality::Flawless) => 6.5,
+                    (GemType::Diamond, GemQuality::Perfect) => 7.5,
+                    (GemType::Amethyst, GemQuality::Chipped) => 10.,
+                    (GemType::Amethyst, GemQuality::Flawed) => 12.,
+                    (GemType::Amethyst, GemQuality::Normal) => 13.,
+                    (GemType::Amethyst, GemQuality::Flawless) => 13.5,
+                    (GemType::Amethyst, GemQuality::Perfect) => 16.,
+                    (GemType::Opal, GemQuality::Chipped) => 6.,
+                    (GemType::Opal, GemQuality::Flawed) => 7.,
+                    (GemType::Opal, GemQuality::Normal) => 8.,
+                    (GemType::Opal, GemQuality::Flawless) => 9.,
+                    (GemType::Opal, GemQuality::Perfect) => 10.,
+                    (GemType::Aquamarine, GemQuality::Chipped) => 3.5,
+                    (GemType::Aquamarine, GemQuality::Flawed) => 3.65,
+                    (GemType::Aquamarine, GemQuality::Normal) => 3.8,
+                    (GemType::Aquamarine, GemQuality::Flawless) => 4.,
+                    (GemType::Aquamarine, GemQuality::Perfect) => 5.5,
+                    (GemType::Topaz, _) => 5.,
+                },
+                color: typ.into(),
+                damage: match (typ, quality) {
+                    (GemType::Emerald, GemQuality::Chipped) => Damage::Range(4..=7),
+                    (GemType::Emerald, GemQuality::Flawed) => Damage::Range(10..=13),
+                    (GemType::Emerald, GemQuality::Normal) => Damage::Range(15..=25),
+                    (GemType::Emerald, GemQuality::Flawless) => Damage::Range(30..=37),
+                    (GemType::Emerald, GemQuality::Perfect) => Damage::Range(80..=95),
+                    (GemType::Ruby, GemQuality::Chipped) => Damage::Range(8..=9),
+                    (GemType::Ruby, GemQuality::Flawed) => Damage::Range(13..=16),
+                    (GemType::Ruby, GemQuality::Normal) => Damage::Range(20..=25),
+                    (GemType::Ruby, GemQuality::Flawless) => Damage::Range(38..=45),
+                    (GemType::Ruby, GemQuality::Perfect) => Damage::Range(80..=100),
+                    (GemType::Sapphire, GemQuality::Chipped) => Damage::Range(5..=8),
+                    (GemType::Sapphire, GemQuality::Flawed) => Damage::Range(10..=14),
+                    (GemType::Sapphire, GemQuality::Normal) => Damage::Range(16..=22),
+                    (GemType::Sapphire, GemQuality::Flawless) => Damage::Range(30..=40),
+                    (GemType::Sapphire, GemQuality::Perfect) => Damage::Range(60..=80),
+                    (GemType::Diamond, GemQuality::Chipped) => Damage::Range(8..=12),
+                    (GemType::Diamond, GemQuality::Flawed) => Damage::Range(16..=18),
+                    (GemType::Diamond, GemQuality::Normal) => Damage::Range(30..=37),
+                    (GemType::Diamond, GemQuality::Flawless) => Damage::Range(58..=65),
+                    (GemType::Diamond, GemQuality::Perfect) => Damage::Range(140..=150),
+                    (GemType::Amethyst, GemQuality::Chipped) => Damage::Range(10..=15),
+                    (GemType::Amethyst, GemQuality::Flawed) => Damage::Range(20..=27),
+                    (GemType::Amethyst, GemQuality::Normal) => Damage::Range(30..=45),
+                    (GemType::Amethyst, GemQuality::Flawless) => Damage::Range(60..=80),
+                    (GemType::Amethyst, GemQuality::Perfect) => Damage::Range(140..=170),
+                    (GemType::Opal, GemQuality::Chipped) => Damage::Fixed(5),
+                    (GemType::Opal, GemQuality::Flawed) => Damage::Fixed(10),
+                    (GemType::Opal, GemQuality::Normal) => Damage::Fixed(20),
+                    (GemType::Opal, GemQuality::Flawless) => Damage::Fixed(40),
+                    (GemType::Opal, GemQuality::Perfect) => Damage::Fixed(85),
+                    (GemType::Aquamarine, GemQuality::Chipped) => Damage::Range(6..=8),
+                    (GemType::Aquamarine, GemQuality::Flawed) => Damage::Range(12..=15),
+                    (GemType::Aquamarine, GemQuality::Normal) => Damage::Range(24..=30),
+                    (GemType::Aquamarine, GemQuality::Flawless) => Damage::Range(48..=55),
+                    (GemType::Aquamarine, GemQuality::Perfect) => Damage::Range(100..=120),
+                    (GemType::Topaz, GemQuality::Chipped) => Damage::Fixed(4),
+                    (GemType::Topaz, GemQuality::Flawed) => Damage::Fixed(8),
+                    (GemType::Topaz, GemQuality::Normal) => Damage::Fixed(14),
+                    (GemType::Topaz, GemQuality::Flawless) => Damage::Fixed(25),
+                    (GemType::Topaz, GemQuality::Perfect) => Damage::Fixed(75),
+                },
+                hits: match typ {
+                    GemType::Ruby => Hits::Ground,
+                    GemType::Amethyst => Hits::Flying,
+                    _ => Hits::All,
+                },
+            },
+            Tower::Dirt => todo!(),
+        }
+    }
+}
+
+impl From<Tower> for Cooldown {
+    fn from(value: Tower) -> Self {
         // Make a cooldown timer that starts in a finished state
         let time = value.get_base_cooldown_time();
         let mut timer = Timer::from_seconds(time, TimerMode::Once);
@@ -417,15 +426,18 @@ impl From<GemTower> for Cooldown {
     }
 }
 
-impl From<GemTower> for shape::Cube {
-    fn from(value: GemTower) -> Self {
+impl From<Tower> for shape::Cube {
+    fn from(value: Tower) -> Self {
         shape::Cube {
-            size: match value.quality {
-                GemQuality::Chipped => 0.4,
-                GemQuality::Flawed => 0.8,
-                GemQuality::Normal => 1.2,
-                GemQuality::Flawless => 1.6,
-                GemQuality::Perfect => 2.0,
+            size: match value {
+                Tower::GemTower { quality, .. } => match quality {
+                    GemQuality::Chipped => 0.4,
+                    GemQuality::Flawed => 0.8,
+                    GemQuality::Normal => 1.2,
+                    GemQuality::Flawless => 1.6,
+                    GemQuality::Perfect => 2.0,
+                },
+                Tower::Dirt => 2.,
             },
         }
     }
@@ -662,14 +674,13 @@ impl PickTower {
                     commands.entity(entity).despawn_recursive();
                     commands.spawn((
                         PbrBundle {
-                            mesh: meshes.add(Cube { size: 2.0 }.into()),
+                            mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
                             material: mats.add(Color::ORANGE_RED.into()),
                             transform: transform.compute_transform(),
                             ..default()
                         },
                         Name::new("Dirt"),
-                        Dirt,
-                        Tower,
+                        Tower::Dirt,
                     ));
                 }
             }
@@ -715,30 +726,34 @@ impl UpgradeAndPick {
         mut pick_events: EventWriter<PickTower>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
-        towers: Query<(Entity, &GlobalTransform, &GemTower)>,
+        towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
         for UpgradeAndPick(entity) in upgrade_events.iter() {
             if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
                 commands.entity(old_tower).despawn_recursive();
-                let new_tower = tower.get_upgrade();
-                let cooldown: Cooldown = new_tower.into();
-                let new_tower = new_tower.add_abilities(&mut commands.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
-                        material: mats.add(new_tower.typ.into()),
-                        transform: tower_pos.compute_transform(),
-                        ..default()
-                    },
-                    new_tower,
-                    Name::new(new_tower.to_string()),
-                    Tower,
-                    LaserAttack::from(new_tower),
-                    cooldown,
-                    Target::Single(None),
-                    SpeedModifiers::default(),
-                    JustBuilt,
-                )));
-                pick_events.send(PickTower(new_tower));
+                match tower.get_upgrade() {
+                    Tower::GemTower { typ, quality } => {
+                        let new_tower = Tower::GemTower { typ, quality };
+                        let cooldown: Cooldown = new_tower.into();
+                        let new_tower = new_tower.add_abilities(&mut commands.spawn((
+                            PbrBundle {
+                                mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                                material: mats.add(typ.into()),
+                                transform: tower_pos.compute_transform(),
+                                ..default()
+                            },
+                            Name::new(new_tower.to_string()),
+                            new_tower,
+                            LaserAttack::from(new_tower),
+                            cooldown,
+                            Target::Single(None),
+                            SpeedModifiers::default(),
+                            JustBuilt,
+                        )));
+                        pick_events.send(PickTower(new_tower));
+                    }
+                    Tower::Dirt => todo!(),
+                }
             }
         }
     }
@@ -755,45 +770,48 @@ impl Upgrade {
         mut upgrade_events: EventReader<Upgrade>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
-        towers: Query<(Entity, &GlobalTransform, &GemTower)>,
+        towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
         for Upgrade(entity) in upgrade_events.iter() {
             if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
-                commands.entity(old_tower).despawn_recursive();
-                let new_tower = tower.get_upgrade();
-                let cooldown: Cooldown = new_tower.into();
-                new_tower.add_abilities(&mut commands.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
-                        material: mats.add(new_tower.typ.into()),
-                        transform: tower_pos.compute_transform(),
-                        ..default()
-                    },
-                    new_tower,
-                    Name::new(new_tower.to_string()),
-                    Tower,
-                    LaserAttack::from(new_tower),
-                    cooldown,
-                    Target::Single(None),
-                    SpeedModifiers::default(),
-                )));
-                for (remove_tower, remove_tower_pos, _) in
-                    towers.iter().filter(|(remove_tower, _, gem_tower)| {
-                        *remove_tower != old_tower && tower == *gem_tower
-                    })
-                {
-                    commands.entity(remove_tower).despawn_recursive();
-                    commands.spawn((
-                        PbrBundle {
-                            mesh: meshes.add(Cube { size: 2.0 }.into()),
-                            material: mats.add(Color::ORANGE_RED.into()),
-                            transform: remove_tower_pos.compute_transform(),
-                            ..default()
-                        },
-                        Name::new("Dirt"),
-                        Dirt,
-                        Tower,
-                    ));
+                match tower {
+                    Tower::GemTower { typ, .. } => {
+                        commands.entity(old_tower).despawn_recursive();
+                        let new_tower = tower.get_upgrade();
+                        let cooldown: Cooldown = new_tower.into();
+                        new_tower.add_abilities(&mut commands.spawn((
+                            PbrBundle {
+                                mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                                material: mats.add(Into::<Color>::into(*typ).into()),
+                                transform: tower_pos.compute_transform(),
+                                ..default()
+                            },
+                            new_tower,
+                            Name::new(new_tower.to_string()),
+                            LaserAttack::from(new_tower),
+                            cooldown,
+                            Target::Single(None),
+                            SpeedModifiers::default(),
+                        )));
+                        for (remove_tower, remove_tower_pos, _) in
+                            towers.iter().filter(|(remove_tower, _, gem_tower)| {
+                                *remove_tower != old_tower && tower == *gem_tower
+                            })
+                        {
+                            commands.entity(remove_tower).despawn_recursive();
+                            commands.spawn((
+                                PbrBundle {
+                                    mesh: meshes.add(Into::<Cube>::into(Tower::Dirt).into()),
+                                    material: mats.add(Color::ORANGE_RED.into()),
+                                    transform: remove_tower_pos.compute_transform(),
+                                    ..default()
+                                },
+                                Name::new("Dirt"),
+                                Tower::Dirt,
+                            ));
+                        }
+                    }
+                    Tower::Dirt => todo!(),
                 }
             }
         }
