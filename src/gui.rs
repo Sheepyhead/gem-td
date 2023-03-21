@@ -3,7 +3,9 @@ use bevy_egui::EguiContexts;
 
 use crate::{
     controls::SelectedTower,
-    towers::{Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RemoveTower, UpgradeAndPick},
+    towers::{
+        Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower, UpgradeAndPick,
+    },
     Phase,
 };
 
@@ -12,6 +14,7 @@ pub fn show_sidebar(
     mut pick_events: EventWriter<PickTower>,
     mut remove_events: EventWriter<RemoveTower>,
     mut upgrade_and_pick_events: EventWriter<UpgradeAndPick>,
+    mut chance: ResMut<RandomLevel>,
     phase: Res<State<Phase>>,
     selected: Res<SelectedTower>,
     names: Query<&Name>,
@@ -80,6 +83,13 @@ pub fn show_sidebar(
                         }
                         Phase::Spawn => {}
                     }
+                }
+
+                if ui
+                    .button(format!("Upgrade chance to {}", **chance + 1))
+                    .clicked()
+                {
+                    **chance += 1;
                 }
             });
         });

@@ -63,12 +63,13 @@ pub fn uncover_dirt(
     mut commands: Commands,
     mut mats: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    random_level: Res<RandomLevel>,
     just_built: Query<Entity, With<JustBuilt>>,
 ) {
     for entity in &just_built {
         let gem_tower = GemTower {
             typ: GemType::random(),
-            quality: GemQuality::random(),
+            quality: GemQuality::random_with_modifier(**random_level),
         };
         let cooldown: Cooldown = gem_tower.into();
         gem_tower.add_abilities(commands.entity(entity).insert((
@@ -129,14 +130,15 @@ pub enum GemQuality {
 }
 
 impl GemQuality {
-    pub fn random() -> Self {
-        match fastrand::u8(0..5) {
+    #[allow(clippy::cast_sign_loss)]
+    pub fn random_with_modifier(level: u32) -> Self {
+        match level {
             0 => Self::Chipped,
-            1 => Self::Flawed,
-            2 => Self::Normal,
-            3 => Self::Flawless,
-            4 => Self::Perfect,
-            _ => panic!("Gem quality over 4 detected, this should not happen"),
+            1 => match (fastrand::f32() * 100.) as u32 {
+                0..=69 => Self::Chipped,
+                _ => Self::Flawed,
+            },
+            _ => unimplemented!(),
         }
     }
 }
@@ -741,3 +743,6 @@ impl UpgradeAndPick {
         }
     }
 }
+
+#[derive(Default, Deref, DerefMut, Resource)]
+pub struct RandomLevel(u32);
