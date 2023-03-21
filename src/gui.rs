@@ -4,7 +4,8 @@ use bevy_egui::EguiContexts;
 use crate::{
     controls::SelectedTower,
     towers::{
-        Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower, UpgradeAndPick,
+        Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower, Upgrade,
+        UpgradeAndPick,
     },
     Phase,
 };
@@ -14,12 +15,14 @@ pub fn show_sidebar(
     mut pick_events: EventWriter<PickTower>,
     mut remove_events: EventWriter<RemoveTower>,
     mut upgrade_and_pick_events: EventWriter<UpgradeAndPick>,
+    mut upgrade_events: EventWriter<Upgrade>,
     mut chance: ResMut<RandomLevel>,
     phase: Res<State<Phase>>,
     selected: Res<SelectedTower>,
     names: Query<&Name>,
     towers: Query<&LaserAttack>,
     just_built_gem_towers: Query<&GemTower, With<JustBuilt>>,
+    gem_towers: Query<&GemTower, Without<JustBuilt>>,
     dirt: Query<(), With<Dirt>>,
     just_built: Query<(), With<JustBuilt>>,
 ) {
@@ -81,7 +84,19 @@ pub fn show_sidebar(
                                 remove_events.send(RemoveTower(selected_tower));
                             }
                         }
-                        Phase::Spawn => {}
+                        Phase::Spawn => {
+                            if let Ok(tower) = gem_towers.get(selected_tower) {
+                                if gem_towers
+                                    .iter()
+                                    .filter(|other_gem_tower| *other_gem_tower == tower)
+                                    .count()
+                                    >= 2
+                                    && ui.button("Combine!").clicked()
+                                {
+                                    upgrade_events.send(Upgrade(selected_tower));
+                                }
+                            }
+                        }
                     }
                 }
 

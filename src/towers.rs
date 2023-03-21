@@ -746,3 +746,56 @@ impl UpgradeAndPick {
 
 #[derive(Default, Deref, DerefMut, Resource)]
 pub struct RandomLevel(u32);
+
+pub struct Upgrade(pub Entity);
+
+impl Upgrade {
+    pub fn upgrade(
+        mut commands: Commands,
+        mut upgrade_events: EventReader<Upgrade>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut mats: ResMut<Assets<StandardMaterial>>,
+        towers: Query<(Entity, &GlobalTransform, &GemTower)>,
+    ) {
+        for Upgrade(entity) in upgrade_events.iter() {
+            if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
+                commands.entity(old_tower).despawn_recursive();
+                let new_tower = tower.get_upgrade();
+                let cooldown: Cooldown = new_tower.into();
+                new_tower.add_abilities(&mut commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Into::<Cube>::into(new_tower).into()),
+                        material: mats.add(new_tower.typ.into()),
+                        transform: tower_pos.compute_transform(),
+                        ..default()
+                    },
+                    new_tower,
+                    Name::new(new_tower.to_string()),
+                    Tower,
+                    LaserAttack::from(new_tower),
+                    cooldown,
+                    Target::Single(None),
+                    SpeedModifiers::default(),
+                )));
+                for (remove_tower, remove_tower_pos, _) in
+                    towers.iter().filter(|(remove_tower, _, gem_tower)| {
+                        *remove_tower != old_tower && tower == *gem_tower
+                    })
+                {
+                    commands.entity(remove_tower).despawn_recursive();
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cube { size: 2.0 }.into()),
+                            material: mats.add(Color::ORANGE_RED.into()),
+                            transform: remove_tower_pos.compute_transform(),
+                            ..default()
+                        },
+                        Name::new("Dirt"),
+                        Dirt,
+                        Tower,
+                    ));
+                }
+            }
+        }
+    }
+}

@@ -36,7 +36,7 @@ use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
     rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickTower, RandomLevel, RemoveTower,
-    UpgradeAndPick,
+    Upgrade, UpgradeAndPick,
 };
 
 mod common;
@@ -90,6 +90,7 @@ fn main() {
         .add_event::<PickTower>()
         .add_event::<RemoveTower>()
         .add_event::<UpgradeAndPick>()
+        .add_event::<Upgrade>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
@@ -128,6 +129,7 @@ fn main() {
             SelectedTower::selection,
             RemoveTower::remove,
             UpgradeAndPick::upgrade_and_pick,
+            Upgrade::upgrade,
         ))
         .run();
 }
