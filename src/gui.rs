@@ -4,8 +4,8 @@ use bevy_egui::EguiContexts;
 use crate::{
     controls::SelectedTower,
     towers::{
-        Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower, Upgrade,
-        UpgradeAndPick,
+        Cooldown, Dirt, GemTower, JustBuilt, LaserAttack, PickTower, RandomLevel, RemoveTower,
+        Upgrade, UpgradeAndPick,
     },
     Phase,
 };
@@ -20,7 +20,7 @@ pub fn show_sidebar(
     phase: Res<State<Phase>>,
     selected: Res<SelectedTower>,
     names: Query<&Name>,
-    towers: Query<&LaserAttack>,
+    tower_stats: Query<(&LaserAttack, &Cooldown)>,
     just_built_gem_towers: Query<&GemTower, With<JustBuilt>>,
     gem_towers: Query<&GemTower, Without<JustBuilt>>,
     dirt: Query<(), With<Dirt>>,
@@ -46,16 +46,20 @@ pub fn show_sidebar(
                         ui.label(format!("Selected tower: {name}"));
                     }
 
-                    if let Ok(LaserAttack {
-                        range,
-                        damage,
-                        hits,
-                        ..
-                    }) = towers.get(selected_tower)
+                    if let Ok((
+                        LaserAttack {
+                            range,
+                            damage,
+                            hits,
+                            ..
+                        },
+                        Cooldown(timer),
+                    )) = tower_stats.get(selected_tower)
                     {
                         ui.label(format!("Range: {range}"));
                         ui.label(format!("Damage: {damage}"));
                         ui.label(format!("Targets: {hits}"));
+                        ui.label(format!("Attack speed: {}", timer.duration().as_secs_f32()));
                     }
                     match phase.0 {
                         Phase::Pick => {
