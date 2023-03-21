@@ -236,23 +236,23 @@ impl GemTower {
             }),
             (GemType::Opal, GemQuality::Chipped) => entity.insert(Aura {
                 typ: AuraType::Opal(10),
-                range: 6.,
+                range: 8.,
             }),
             (GemType::Opal, GemQuality::Flawed) => entity.insert(Aura {
                 typ: AuraType::Opal(15),
-                range: 7.,
+                range: 9.,
             }),
             (GemType::Opal, GemQuality::Normal) => entity.insert(Aura {
                 typ: AuraType::Opal(20),
-                range: 8.,
+                range: 10.,
             }),
             (GemType::Opal, GemQuality::Flawless) => entity.insert(Aura {
                 typ: AuraType::Opal(25),
-                range: 9.,
+                range: 11.,
             }),
             (GemType::Opal, GemQuality::Perfect) => entity.insert(Aura {
                 typ: AuraType::Opal(35),
-                range: 10.,
+                range: 12.,
             }),
             _ => entity,
         }
