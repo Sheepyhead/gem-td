@@ -132,7 +132,46 @@ impl GemQuality {
                 0..=69 => Self::Chipped,
                 _ => Self::Flawed,
             },
-            _ => unimplemented!(),
+            2 => match (fastrand::f32() * 100.) as u32 {
+                0..=59 => Self::Chipped,
+                60..=89 => Self::Flawed,
+                _ => Self::Normal,
+            },
+            3 => match (fastrand::f32() * 100.) as u32 {
+                0..=49 => Self::Chipped,
+                50..=79 => Self::Flawed,
+                _ => Self::Normal,
+            },
+            4 => match (fastrand::f32() * 100.) as u32 {
+                0..=39 => Self::Chipped,
+                40..=69 => Self::Flawed,
+                70..=89 => Self::Normal,
+                _ => Self::Flawless,
+            },
+            5 => match (fastrand::f32() * 100.) as u32 {
+                0..=29 => Self::Chipped,
+                30..=59 => Self::Flawed,
+                60..=89 => Self::Normal,
+                _ => Self::Flawless,
+            },
+            6 => match (fastrand::f32() * 100.) as u32 {
+                0..=19 => Self::Chipped,
+                20..=49 => Self::Flawed,
+                50..=79 => Self::Normal,
+                _ => Self::Flawless,
+            },
+            7 => match (fastrand::f32() * 100.) as u32 {
+                0..=9 => Self::Chipped,
+                10..=39 => Self::Flawed,
+                40..=69 => Self::Normal,
+                _ => Self::Flawless,
+            },
+            _ => match (fastrand::f32() * 100.) as u32 {
+                0..=29 => Self::Flawed,
+                30..=59 => Self::Normal,
+                60..=89 => Self::Flawless,
+                _ => Self::Perfect,
+            },
         }
     }
 }
