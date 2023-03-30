@@ -20,7 +20,7 @@ use bevy::{
     prelude::{shape::Plane, *},
     window::WindowResolution,
 };
-use bevy_egui::EguiPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_debug_lines::DebugLinesPlugin;
 use bevy_rapier3d::prelude::*;
 use common::{
@@ -31,7 +31,7 @@ use controls::{
     UnderCursor,
 };
 use creeps::{CreepSpawner, Dead, Hit, HitPoints, Slow};
-use gui::show_sidebar;
+use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
@@ -80,8 +80,7 @@ fn main() {
         )
         .add_plugin(DebugLinesPlugin::with_depth_test(true))
         .add_plugin(MapNavPlugin::<CreepPos>::default())
-        // .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(EguiPlugin)
+        .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         // Internal plugins
         .add_state::<Phase>()
@@ -98,6 +97,7 @@ fn main() {
         .init_resource::<SelectedTower>()
         .init_resource::<RandomLevel>()
         .add_plugin(TowerAbilitiesPlugin)
+        .add_plugin(GameGuiPlugin)
         .add_startup_system(startup)
         .add_systems((
             update_under_cursor,
@@ -125,7 +125,6 @@ fn main() {
             next_level.in_schedule(OnExit(Phase::Spawn)),
             Slow::change.in_set(OnUpdate(Phase::Spawn)),
             LaserAttack::update_multiple_targets,
-            show_sidebar,
             SelectedTower::selection,
             RemoveTower::remove,
             UpgradeAndPick::upgrade_and_pick,

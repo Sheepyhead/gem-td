@@ -13,8 +13,6 @@ bevy-inspector-egui = "0.18"
 fastrand = "1.9"
 bevy_rapier3d = "0.21"
 bevy_prototype_debug_lines = { version = "0.10", features = ["3d"] }
-bevy_egui = "0.20"
-egui = "0.21"
 
 [profile.dev]
 opt-level = 1
