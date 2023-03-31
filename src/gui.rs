@@ -1,13 +1,18 @@
 use bevy::prelude::*;
 
-use crate::{controls::SelectedTower, towers::PickTower};
+use crate::{
+    controls::SelectedTower,
+    towers::{PickTower, UpgradeAndPick},
+};
 
 pub struct GameGuiPlugin;
 
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_systems((Sidebar::spawn,))
-            .add_systems((PickGemButton::interaction,));
+        app.add_startup_systems((Sidebar::spawn,)).add_systems((
+            PickGemButton::interaction,
+            UpgradeAndPickButton::interaction,
+        ));
     }
 }
 
@@ -66,7 +71,19 @@ impl Sidebar {
             })
             .id();
 
-        let button = commands
+        let button_bar = commands
+            .spawn((NodeBundle {
+                style: Style {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+                background_color: Color::BLUE.into(),
+                ..default()
+            },))
+            .id();
+
+        let pick_button = commands
             .spawn((
                 ButtonBundle {
                     style: Style {
@@ -79,6 +96,21 @@ impl Sidebar {
                 PickGemButton,
             ))
             .id();
+
+        let combine_button = commands
+            .spawn((
+                ButtonBundle {
+                    style: Style {
+                        size: Size::all(Val::Px(50.)),
+                        ..default()
+                    },
+                    background_color: Color::GREEN.into(),
+                    ..default()
+                },
+                UpgradeAndPickButton,
+            ))
+            .id();
+
         let icon = commands
             .spawn(ImageBundle {
                 image: UiImage::new(ass.load("chipped.PNG")),
@@ -94,8 +126,12 @@ impl Sidebar {
         commands
             .entity(sidebar_background)
             .add_child(title)
-            .add_child(button);
-        commands.entity(button).add_child(icon);
+            .add_child(button_bar);
+        commands
+            .entity(button_bar)
+            .add_child(pick_button)
+            .add_child(combine_button);
+        commands.entity(pick_button).add_child(icon);
     }
 
     fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<Sidebar>>) {
@@ -118,6 +154,25 @@ impl PickGemButton {
             if let Interaction::Clicked = interaction {
                 if let Some(selected) = **selected {
                     events.send(PickTower(selected));
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct UpgradeAndPickButton;
+
+impl UpgradeAndPickButton {
+    fn interaction(
+        mut events: EventWriter<UpgradeAndPick>,
+        selected: Res<SelectedTower>,
+        buttons: Query<&Interaction, (With<UpgradeAndPickButton>, Changed<Interaction>)>,
+    ) {
+        for interaction in &buttons {
+            if let Interaction::Clicked = interaction {
+                if let Some(selected) = **selected {
+                    events.send(UpgradeAndPick(selected));
                 }
             }
         }
