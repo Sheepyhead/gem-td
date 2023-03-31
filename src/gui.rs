@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 
+use crate::{controls::SelectedTower, towers::PickTower};
+
 pub struct GameGuiPlugin;
 
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_systems((Sidebar::spawn,));
+        app.add_startup_systems((Sidebar::spawn,))
+            .add_systems((PickGemButton::interaction,));
     }
 }
 
@@ -64,14 +67,17 @@ impl Sidebar {
             .id();
 
         let button = commands
-            .spawn(ButtonBundle {
-                style: Style {
-                    size: Size::all(Val::Px(50.)),
+            .spawn((
+                ButtonBundle {
+                    style: Style {
+                        size: Size::all(Val::Px(50.)),
+                        ..default()
+                    },
+                    background_color: Color::PINK.into(),
                     ..default()
                 },
-                background_color: Color::PINK.into(),
-                ..default()
-            })
+                PickGemButton,
+            ))
             .id();
         let icon = commands
             .spawn(ImageBundle {
@@ -95,6 +101,25 @@ impl Sidebar {
     fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<Sidebar>>) {
         for sidebar in &sidebar {
             commands.entity(sidebar).despawn_recursive();
+        }
+    }
+}
+
+#[derive(Component)]
+struct PickGemButton;
+
+impl PickGemButton {
+    fn interaction(
+        mut events: EventWriter<PickTower>,
+        selected: Res<SelectedTower>,
+        buttons: Query<&Interaction, (With<PickGemButton>, Changed<Interaction>)>,
+    ) {
+        for interaction in &buttons {
+            if let Interaction::Clicked = interaction {
+                if let Some(selected) = **selected {
+                    events.send(PickTower(selected));
+                }
+            }
         }
     }
 }

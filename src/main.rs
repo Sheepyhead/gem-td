@@ -48,7 +48,7 @@ mod tower_abilities;
 mod towers;
 
 pub const CLEAR: Color = Color::BLACK;
-pub const WINDOW_HEIGHT: f32 = 600.0;
+pub const WINDOW_HEIGHT: f32 = 800.0;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const CAMERA_OFFSET: [f32; 3] = [0.0, 12.0, 10.0];
 pub const CREEP_CLEARANCE: f32 = 0.25;
@@ -68,8 +68,8 @@ fn main() {
                         resolution: WindowResolution::new(
                             WINDOW_HEIGHT * RESOLUTION,
                             WINDOW_HEIGHT,
-                        ),
-
+                        )
+                        .with_scale_factor_override(1.),
                         title: "GEM TD".to_string(),
                         resizable: false,
                         ..default()
