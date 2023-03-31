@@ -101,7 +101,8 @@ impl SlowPoison {
                     events.send(Dead(creep));
                 }
             }
-            if poison.duration.tick(time.delta()).finished() {
+            if poison.duration.tick(time.delta()).finished() && commands.get_entity(creep).is_some()
+            {
                 commands.entity(creep).remove::<SlowPoison>();
                 slow.remove(&SlowSource::Poison);
             }

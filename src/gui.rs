@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     controls::SelectedTower,
-    towers::{PickTower, UpgradeAndPick},
+    towers::{PickTower, RandomLevel, UpgradeAndPick},
 };
 
 pub struct GameGuiPlugin;
@@ -12,6 +12,7 @@ impl Plugin for GameGuiPlugin {
         app.add_startup_systems((Sidebar::spawn,)).add_systems((
             PickGemButton::interaction,
             UpgradeAndPickButton::interaction,
+            UpgradeChanceButton::interaction,
         ));
     }
 }
@@ -110,6 +111,19 @@ impl Sidebar {
                 UpgradeAndPickButton,
             ))
             .id();
+        let upgrade_chance_button = commands
+            .spawn((
+                ButtonBundle {
+                    style: Style {
+                        size: Size::all(Val::Px(50.)),
+                        ..default()
+                    },
+                    background_color: Color::YELLOW.into(),
+                    ..default()
+                },
+                UpgradeChanceButton,
+            ))
+            .id();
 
         let icon = commands
             .spawn(ImageBundle {
@@ -130,7 +144,8 @@ impl Sidebar {
         commands
             .entity(button_bar)
             .add_child(pick_button)
-            .add_child(combine_button);
+            .add_child(combine_button)
+            .add_child(upgrade_chance_button);
         commands.entity(pick_button).add_child(icon);
     }
 
@@ -174,6 +189,22 @@ impl UpgradeAndPickButton {
                 if let Some(selected) = **selected {
                     events.send(UpgradeAndPick(selected));
                 }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct UpgradeChanceButton;
+
+impl UpgradeChanceButton {
+    fn interaction(
+        mut random_level: ResMut<RandomLevel>,
+        buttons: Query<&Interaction, (With<UpgradeChanceButton>, Changed<Interaction>)>,
+    ) {
+        for interaction in &buttons {
+            if let Interaction::Clicked = interaction {
+                **random_level += 1;
             }
         }
     }
