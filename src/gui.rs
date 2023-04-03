@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     controls::SelectedTower,
-    towers::{PickTower, RandomLevel, UpgradeAndPick},
+    towers::{Cooldown, LaserAttack, PickTower, RandomLevel, UpgradeAndPick},
 };
 
 pub struct GameGuiPlugin;
@@ -13,6 +13,7 @@ impl Plugin for GameGuiPlugin {
             PickGemButton::interaction,
             UpgradeAndPickButton::interaction,
             UpgradeChanceButton::interaction,
+            SelectedText::on_update,
         ));
     }
 }
@@ -63,13 +64,31 @@ impl Sidebar {
                 text: Text::from_section(
                     "Title",
                     TextStyle {
-                        font: ass.load("Pixelcastle-Regular.otf"),
-                        font_size: 25.,
+                        font: ass.load("Mukta-Regular.ttf"),
+                        font_size: 45.,
                         color: Color::ANTIQUE_WHITE,
                     },
                 ),
+                style: Style {
+                    align_self: AlignSelf::Center,
+                    ..default()
+                },
                 ..default()
             })
+            .id();
+
+        let selected_text = commands
+            .spawn((
+                TextBundle {
+                    text: Text::default(),
+                    style: Style {
+                        align_self: AlignSelf::Start,
+                        ..default()
+                    },
+                    ..default()
+                },
+                SelectedText,
+            ))
             .id();
 
         let button_bar = commands
@@ -137,15 +156,19 @@ impl Sidebar {
             .id();
 
         commands.entity(full_screen).add_child(sidebar_background);
+
         commands
             .entity(sidebar_background)
             .add_child(title)
+            .add_child(selected_text)
             .add_child(button_bar);
+
         commands
             .entity(button_bar)
             .add_child(pick_button)
             .add_child(combine_button)
             .add_child(upgrade_chance_button);
+
         commands.entity(pick_button).add_child(icon);
     }
 
@@ -205,6 +228,64 @@ impl UpgradeChanceButton {
         for interaction in &buttons {
             if let Interaction::Clicked = interaction {
                 **random_level += 1;
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct SelectedText;
+
+impl SelectedText {
+    fn on_update(
+        ass: Res<AssetServer>,
+        selected: Res<SelectedTower>,
+        mut text: Query<&mut Text, With<SelectedText>>,
+        tower_stats: Query<(&Name, Option<&LaserAttack>, Option<&Cooldown>)>,
+    ) {
+        if selected.is_changed() {
+            if let Some(selected_entity) = **selected {
+                if let Ok((name, attack, cooldown)) = tower_stats.get(selected_entity) {
+                    let mut text = text.single_mut();
+                    let mut style = TextStyle {
+                        font: ass.load("Mukta-Regular.ttf"),
+                        font_size: 30.,
+                        color: if let Some(LaserAttack { color, .. }) = attack {
+                            *color
+                        } else {
+                            Color::ANTIQUE_WHITE
+                        },
+                    };
+                    let mut text_section =
+                        Text::from_sections([TextSection::new(format!("{name}\n"), style.clone())]);
+                    style.color = Color::ANTIQUE_WHITE;
+                    if let Some(LaserAttack {
+                        range,
+                        damage,
+                        hits,
+                        ..
+                    }) = attack
+                    {
+                        text_section
+                            .sections
+                            .push(TextSection::new(format!("Range: {range}\n"), style.clone()));
+                        text_section.sections.push(TextSection::new(
+                            format!("Damage: {damage}\n"),
+                            style.clone(),
+                        ));
+                        text_section.sections.push(TextSection::new(
+                            format!("Targets: {hits}\n"),
+                            style.clone(),
+                        ));
+                    }
+                    if let Some(Cooldown(timer)) = cooldown {
+                        text_section.sections.push(TextSection::new(
+                            format!("Attack speed: {}", timer.duration().as_secs_f32()),
+                            style,
+                        ));
+                    }
+                    *text = text_section;
+                }
             }
         }
     }

@@ -190,7 +190,7 @@ impl From<GemType> for Color {
             GemType::Ruby => Color::RED,
             GemType::Sapphire => Color::BLUE,
             GemType::Diamond => Color::WHITE,
-            GemType::Amethyst => Color::PURPLE,
+            GemType::Amethyst => Color::FUCHSIA,
             GemType::Opal => Color::ORANGE,
             GemType::Aquamarine => Color::SEA_GREEN,
             GemType::Topaz => Color::YELLOW,
