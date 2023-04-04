@@ -36,7 +36,7 @@ use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
-    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel, Refine,
+    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel,
     RefineAndPickSelectedTower, RemoveSelectedTower,
 };
 
@@ -91,7 +91,6 @@ fn main() {
         .add_event::<PickSelectedTower>()
         .add_event::<RemoveSelectedTower>()
         .add_event::<RefineAndPickSelectedTower>()
-        .add_event::<Refine>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
@@ -130,7 +129,6 @@ fn main() {
             SelectedTower::selection,
             RemoveSelectedTower::remove,
             RefineAndPickSelectedTower::refine_and_pick,
-            Refine::refine,
             cursor_over_gui,
         ))
         .run();
