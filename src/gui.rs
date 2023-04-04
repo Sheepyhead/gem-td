@@ -4,7 +4,11 @@ use bevy::prelude::*;
 
 use crate::{
     controls::SelectedTower,
-    towers::{Cooldown, LaserAttack, PickSelectedTower, RandomLevel, UpgradeAndPickSelectedTower},
+    towers::{
+        Cooldown, LaserAttack, PickSelectedTower, RandomLevel, RemoveSelectedTower,
+        UpgradeAndPickSelectedTower,
+    },
+    Phase,
 };
 
 pub struct GameGuiPlugin;
@@ -12,8 +16,11 @@ pub struct GameGuiPlugin;
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_systems((Sidebar::spawn,)).add_systems((
-            event_buttons::<PickSelectedTower>,
-            event_buttons::<UpgradeAndPickSelectedTower>,
+            event_buttons::<PickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+            event_buttons::<UpgradeAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+            event_buttons::<RemoveSelectedTower>
+                .in_set(OnUpdate(Phase::Pick))
+                .in_set(OnUpdate(Phase::Build)),
             UpgradeChanceButton::interaction,
             SelectedText::on_update,
         ));
@@ -105,57 +112,60 @@ impl Sidebar {
             },))
             .id();
 
-        let pick_button = commands
-            .spawn((EventButtonBundle {
-                button: ButtonBundle {
-                    style: Style {
-                        size: Size::all(Val::Px(50.)),
+        let buttons = [
+            commands
+                .spawn((EventButtonBundle {
+                    button: ButtonBundle {
+                        style: Style {
+                            size: Size::all(Val::Px(50.)),
+                            ..default()
+                        },
+                        background_color: Color::PINK.into(),
                         ..default()
                     },
-                    background_color: Color::PINK.into(),
-                    ..default()
-                },
-                event: EventButton::<PickSelectedTower>::new(),
-            },))
-            .id();
-
-        let combine_button = commands
-            .spawn((EventButtonBundle {
-                button: ButtonBundle {
-                    style: Style {
-                        size: Size::all(Val::Px(50.)),
+                    event: EventButton::<PickSelectedTower>::new(),
+                },))
+                .id(),
+            commands
+                .spawn((EventButtonBundle {
+                    button: ButtonBundle {
+                        style: Style {
+                            size: Size::all(Val::Px(50.)),
+                            ..default()
+                        },
+                        background_color: Color::GREEN.into(),
                         ..default()
                     },
-                    background_color: Color::GREEN.into(),
-                    ..default()
-                },
-                event: EventButton::<UpgradeAndPickSelectedTower>::new(),
-            },))
-            .id();
-        let upgrade_chance_button = commands
-            .spawn((
-                ButtonBundle {
-                    style: Style {
-                        size: Size::all(Val::Px(50.)),
+                    event: EventButton::<UpgradeAndPickSelectedTower>::new(),
+                },))
+                .id(),
+            commands
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            size: Size::all(Val::Px(50.)),
+                            ..default()
+                        },
+                        background_color: Color::TEAL.into(),
                         ..default()
                     },
-                    background_color: Color::YELLOW.into(),
-                    ..default()
-                },
-                UpgradeChanceButton,
-            ))
-            .id();
-
-        let icon = commands
-            .spawn(ImageBundle {
-                image: UiImage::new(ass.load("chipped.PNG")),
-                style: Style {
-                    size: Size::width(Val::Percent(100.)),
-                    ..default()
-                },
-                ..default()
-            })
-            .id();
+                    EventButton::<RemoveSelectedTower>::new(),
+                ))
+                .id(),
+            commands
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            size: Size::all(Val::Px(50.)),
+                            ..default()
+                        },
+                        background_color: Color::YELLOW.into(),
+                        ..default()
+                    },
+                    UpgradeChanceButton,
+                ))
+                .id(),
+        ];
 
         commands.entity(full_screen).add_child(sidebar_background);
 
@@ -165,13 +175,7 @@ impl Sidebar {
             .add_child(selected_text)
             .add_child(button_bar);
 
-        commands
-            .entity(button_bar)
-            .add_child(pick_button)
-            .add_child(combine_button)
-            .add_child(upgrade_chance_button);
-
-        commands.entity(pick_button).add_child(icon);
+        commands.entity(button_bar).push_children(&buttons);
     }
 
     fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<Sidebar>>) {

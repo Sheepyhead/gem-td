@@ -731,9 +731,9 @@ impl PickSelectedTower {
         just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            if let Some(picked_tower) = **selected {
+            if let Some(selected_tower) = **selected {
                 for (entity, transform) in &just_built {
-                    if entity == picked_tower {
+                    if entity == selected_tower {
                         commands.entity(entity).remove::<JustBuilt>();
                     } else {
                         commands.entity(entity).despawn_recursive();
@@ -759,25 +759,28 @@ impl PickSelectedTower {
     }
 }
 
-#[derive(Deref, DerefMut)]
-pub struct RemoveTower(pub Entity);
+#[derive(Default)]
+pub struct RemoveSelectedTower;
 
-impl RemoveTower {
+impl RemoveSelectedTower {
     pub fn remove(
         mut commands: Commands,
-        mut events: EventReader<RemoveTower>,
+        mut events: EventReader<RemoveSelectedTower>,
         mut build_grid: ResMut<BuildGrid>,
-        towers: Query<&GlobalTransform>,
+        selected: Res<SelectedTower>,
+        towers: Query<(&Tower, &GlobalTransform), Without<JustBuilt>>,
     ) {
-        for RemoveTower(tower) in events.iter() {
-            if let Ok(transform) = towers.get(*tower) {
-                commands.entity(*tower).despawn_recursive();
+        for _ in events.iter() {
+            if let Some(selected_tower) = **selected {
+                if let Ok((Tower::Dirt, transform)) = towers.get(selected_tower) {
+                    commands.entity(selected_tower).despawn_recursive();
 
-                #[allow(clippy::cast_sign_loss)]
-                let positions = get_squares_from_pos(transform.translation().xz())
-                    .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
-                for pos in positions {
-                    build_grid.remove(&pos);
+                    #[allow(clippy::cast_sign_loss)]
+                    let positions = get_squares_from_pos(transform.translation().xz())
+                        .map(|pos| UVec2::new((pos.x - 0.5) as u32, (pos.y - 0.5) as u32));
+                    for pos in positions {
+                        build_grid.remove(&pos);
+                    }
                 }
             }
         }
@@ -801,8 +804,8 @@ impl UpgradeAndPickSelectedTower {
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
         for _ in upgrade_events.iter() {
-            if let Some(picked_tower) = **selected {
-                if let Ok((old_tower, tower_pos, tower)) = towers.get(picked_tower) {
+            if let Some(selected_tower) = **selected {
+                if let Ok((old_tower, tower_pos, tower)) = towers.get(selected_tower) {
                     commands.entity(old_tower).despawn_recursive();
                     match tower.get_upgrade() {
                         Tower::GemTower { typ, quality } => {
