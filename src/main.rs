@@ -96,7 +96,6 @@ fn main() {
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
         .init_resource::<BuildGrid>()
-        .init_resource::<SelectedTower>()
         .init_resource::<RandomLevel>()
         .add_plugin(TowerAbilitiesPlugin)
         .add_plugin(GameGuiPlugin)

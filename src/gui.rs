@@ -207,14 +207,14 @@ struct SelectedText;
 impl SelectedText {
     fn on_update(
         ass: Res<AssetServer>,
-        selected: Res<SelectedTower>,
+        selected: Option<Res<SelectedTower>>,
         mut text: Query<&mut Text, With<SelectedText>>,
         tower_stats: Query<(&Name, Option<&LaserAttack>, Option<&Cooldown>)>,
     ) {
-        if selected.is_changed() {
-            let mut text = text.single_mut();
-            if let Some(selected_entity) = **selected {
-                if let Ok((name, attack, cooldown)) = tower_stats.get(selected_entity) {
+        if let Some(selected) = selected {
+            if selected.is_changed() {
+                let mut text = text.single_mut();
+                if let Ok((name, attack, cooldown)) = tower_stats.get(**selected) {
                     let mut style = TextStyle {
                         font: ass.load("Mukta-Regular.ttf"),
                         font_size: 30.,
@@ -253,9 +253,9 @@ impl SelectedText {
                         ));
                     }
                     *text = text_section;
+                } else {
+                    *text = Text::default();
                 }
-            } else {
-                *text = Text::default();
             }
         }
     }

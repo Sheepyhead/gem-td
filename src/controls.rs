@@ -190,13 +190,13 @@ pub fn build_on_click(
     }
 }
 
-#[derive(Default, Deref, DerefMut, Resource)]
-pub struct SelectedTower(Option<Entity>);
+#[derive(Deref, DerefMut, Resource)]
+pub struct SelectedTower(pub Entity);
 
 impl SelectedTower {
     pub fn selection(
+        mut commands: Commands,
         mut mouse: EventReader<MouseButtonInput>,
-        mut selected: ResMut<SelectedTower>,
         under_cursor: Res<UnderCursor>,
         towers: Query<(Entity, &GlobalTransform), With<Tower>>,
     ) {
@@ -215,12 +215,12 @@ impl SelectedTower {
                     }
 
                     if let Some(picked_tower) = picked_tower {
-                        **selected = Some(picked_tower);
+                        commands.insert_resource(SelectedTower(picked_tower));
                     } else {
-                        **selected = None;
+                        commands.remove_resource::<SelectedTower>();
                     }
                 } else {
-                    **selected = None;
+                    commands.remove_resource::<SelectedTower>();
                 }
             }
         }
