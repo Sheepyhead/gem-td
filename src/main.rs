@@ -28,16 +28,16 @@ use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
 };
 use controls::{
-    build_on_click, remove_highlight, show_highlight, update_under_cursor, SelectedTower,
-    UnderCursor,
+    build_on_click, cursor_over_gui, remove_highlight, show_highlight, update_under_cursor,
+    CursorOverGui, SelectedTower, UnderCursor,
 };
 use creeps::{CreepSpawner, Dead, Hit, HitPoints, Slow};
 use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
-    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel,
-    RemoveSelectedTower, Upgrade, UpgradeAndPickSelectedTower,
+    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel, Refine,
+    RefineAndPickSelectedTower, RemoveSelectedTower,
 };
 
 mod common;
@@ -90,13 +90,14 @@ fn main() {
         .add_event::<Dead>()
         .add_event::<PickSelectedTower>()
         .add_event::<RemoveSelectedTower>()
-        .add_event::<UpgradeAndPickSelectedTower>()
-        .add_event::<Upgrade>()
+        .add_event::<RefineAndPickSelectedTower>()
+        .add_event::<Refine>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
         .init_resource::<BuildGrid>()
         .init_resource::<RandomLevel>()
+        .init_resource::<CursorOverGui>()
         .add_plugin(TowerAbilitiesPlugin)
         .add_plugin(GameGuiPlugin)
         .add_startup_system(startup)
@@ -128,8 +129,9 @@ fn main() {
             LaserAttack::update_multiple_targets,
             SelectedTower::selection,
             RemoveSelectedTower::remove,
-            UpgradeAndPickSelectedTower::upgrade_and_pick,
-            Upgrade::upgrade,
+            RefineAndPickSelectedTower::refine_and_pick,
+            Refine::refine,
+            cursor_over_gui,
         ))
         .run();
 }
@@ -206,7 +208,7 @@ pub enum Phase {
 
 fn check_state_change(state: Res<State<Phase>>) {
     if state.is_changed() {
-        println!("State changed to {state:?}");
+        // println!("State changed to {state:?}");
     }
 }
 

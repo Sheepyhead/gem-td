@@ -7,15 +7,16 @@ use bevy::{
 use bevy_rapier3d::prelude::*;
 
 use crate::{
-    common::{get_squares_from_pos, ray_from_screenspace, Builds},
+    common::{get_squares_from_pos, position_within_rect, ray_from_screenspace, Builds},
+    gui::Sidebar,
     towers::{BuildGrid, JustBuilt, Tower},
-    Phase,
+    Phase, WINDOW_HEIGHT,
 };
 
 pub fn update_under_cursor(
     context: Res<RapierContext>,
     mut under_cursor: ResMut<UnderCursor>,
-    windows: Query<&Window>,
+    windows: Query<&Window, Changed<Window>>,
     camera: Query<(&bevy::prelude::Camera, &Projection, &GlobalTransform), With<Camera3d>>,
 ) {
     if let Some(cursor_pos_screen) = windows.single().cursor_position() {
@@ -128,6 +129,28 @@ pub fn remove_highlight(mut commands: Commands, highlight: Query<Entity, With<Ti
     }
 }
 
+#[derive(Resource, Default, Deref, DerefMut)]
+pub struct CursorOverGui(bool);
+
+pub fn cursor_over_gui(
+    mut cursor_over_gui: ResMut<CursorOverGui>,
+    gui: Query<(&Node, &GlobalTransform), With<Sidebar>>,
+    windows: Query<&Window, Changed<Window>>,
+) {
+    for (node, transform) in &gui {
+        if let Some(cursor_pos_screen) = windows.single().cursor_position() {
+            **cursor_over_gui = position_within_rect(
+                Vec2 {
+                    x: cursor_pos_screen.x,
+                    y: WINDOW_HEIGHT - cursor_pos_screen.y,
+                },
+                node.size(),
+                transform.translation().xy(),
+            );
+        }
+    }
+}
+
 pub fn build_on_click(
     mut commands: Commands,
     mut mouse: EventReader<MouseButtonInput>,
@@ -138,10 +161,15 @@ pub fn build_on_click(
     mut build_grid: ResMut<BuildGrid>,
     phase: Res<State<Phase>>,
     cursor_pos: Res<UnderCursor>,
+    cursor_over_gui: Res<CursorOverGui>,
 ) {
     // If there are no more builds and the current phase is Build, change phase
     if **builds == 0 && phase.0 == Phase::Build {
         next_phase.set(Phase::Pick);
+        return;
+    }
+
+    if **cursor_over_gui {
         return;
     }
 
@@ -193,6 +221,9 @@ pub fn build_on_click(
 #[derive(Resource)]
 pub struct SelectedTower {
     pub tower: Entity,
+    pub pickable: bool,
+    pub refinable: bool,
+    pub removable: bool,
 }
 
 impl SelectedTower {
@@ -200,7 +231,9 @@ impl SelectedTower {
         mut commands: Commands,
         mut mouse: EventReader<MouseButtonInput>,
         under_cursor: Res<UnderCursor>,
-        towers: Query<(Entity, &GlobalTransform), With<Tower>>,
+        cursor_over_gui: Res<CursorOverGui>,
+        towers: Query<(Entity, &GlobalTransform, &Tower)>,
+        just_built: Query<(), With<JustBuilt>>,
     ) {
         for event in mouse.iter() {
             if let MouseButtonInput {
@@ -208,17 +241,32 @@ impl SelectedTower {
                 state: ButtonState::Pressed,
             } = event
             {
+                if **cursor_over_gui {
+                    continue;
+                }
                 if let Some(cursor_pos) = **under_cursor {
                     let mut picked_tower = None;
-                    for (entity, transform) in &towers {
+                    for (entity, transform, tower) in &towers {
                         if transform.translation().xz().distance(cursor_pos) <= 1.0 {
-                            picked_tower = Some(entity);
+                            picked_tower = Some((entity, tower));
                         }
                     }
 
-                    if let Some(picked_tower) = picked_tower {
+                    if let Some((picked_tower, typ)) = picked_tower {
+                        let just_built = just_built.contains(picked_tower);
+                        let pickable = just_built && *typ != Tower::Dirt;
                         commands.insert_resource(SelectedTower {
                             tower: picked_tower,
+                            pickable,
+                            refinable: towers
+                                .iter()
+                                .filter(|(_, _, tower)| *typ != Tower::Dirt && *tower == typ)
+                                .count()
+                                >= 2,
+                            removable: !just_built
+                                && towers
+                                    .get_component::<Tower>(picked_tower)
+                                    .is_ok_and(|tower| *tower == Tower::Dirt),
                         });
                     } else {
                         commands.remove_resource::<SelectedTower>();

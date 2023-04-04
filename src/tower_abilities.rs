@@ -184,7 +184,6 @@ impl CritOnHit {
         {
             if let (Ok(..), Ok(mut creep)) = (towers.get(*source), creeps.get_mut(*target)) {
                 if fastrand::f32() < 0.25 {
-                    println!("CRIT!");
                     creep.sub(*value);
                     if creep.dead() {
                         deads.send(Dead(*target));
@@ -259,7 +258,6 @@ impl Aura {
         if !aura_changed.is_empty() {
             // New aura tower has been added, recalculate
             Self::reapply_auras(&mut towers, auras.iter());
-            println!("New aura tower!");
         }
     }
 
@@ -271,7 +269,6 @@ impl Aura {
         if !removed.is_empty() {
             // Existing aura tower has been removed, recalculate
             Self::reapply_auras(&mut towers, auras.iter());
-            println!("Removed aura tower!");
         }
     }
 
@@ -283,7 +280,6 @@ impl Aura {
         if !tower_added.is_empty() {
             // New tower has been added, recalculate
             Self::reapply_auras(&mut towers, auras.iter());
-            println!("New non-aura tower!");
         }
     }
 
@@ -344,7 +340,6 @@ impl SpeedModifiers {
         mut modifiers: Query<(&Tower, &mut Cooldown, &SpeedModifiers), Changed<SpeedModifiers>>,
     ) {
         for (tower, mut cooldown, modifiers) in &mut modifiers {
-            println!("Speed modifier changed for tower {tower:?}");
             // Make a cooldown timer that starts in a finished state
             let base_time = tower.get_base_cooldown_time();
             let mut time = base_time;

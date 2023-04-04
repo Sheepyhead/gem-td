@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use crate::{
     controls::SelectedTower,
     towers::{
-        Cooldown, LaserAttack, PickSelectedTower, RandomLevel, RemoveSelectedTower,
-        UpgradeAndPickSelectedTower,
+        Cooldown, LaserAttack, PickSelectedTower, RandomLevel, RefineAndPickSelectedTower,
+        RemoveSelectedTower,
     },
     Phase,
 };
@@ -15,22 +15,28 @@ pub struct GameGuiPlugin;
 
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_systems((Sidebar::spawn,)).add_systems((
-            event_buttons::<PickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-            event_buttons::<UpgradeAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-            event_buttons::<RemoveSelectedTower>
-                .in_set(OnUpdate(Phase::Pick))
-                .in_set(OnUpdate(Phase::Build)),
-            UpgradeChanceButton::interaction,
-            SelectedText::on_update,
-        ));
+        app.add_startup_systems((SidebarFullscreen::spawn,))
+            .add_systems((
+                event_buttons::<PickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                event_buttons::<RefineAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Build)),
+                RefineChanceButton::interaction,
+                SelectedText::on_update,
+                show_pickable_button,
+                show_refine_and_pick_button,
+                show_remove_button,
+            ));
     }
 }
 
 #[derive(Component)]
+pub struct SidebarFullscreen;
+
+#[derive(Component)]
 pub struct Sidebar;
 
-impl Sidebar {
+impl SidebarFullscreen {
     pub fn spawn(mut commands: Commands, ass: Res<AssetServer>) {
         let full_screen = commands
             .spawn((
@@ -43,29 +49,32 @@ impl Sidebar {
                     },
                     ..default()
                 },
-                Sidebar,
+                SidebarFullscreen,
             ))
             .id();
 
         let sidebar_background = commands
-            .spawn(NodeBundle {
-                background_color: Color::DARK_GRAY.into(),
-                style: Style {
-                    flex_direction: FlexDirection::Column,
-                    align_content: AlignContent::Center,
-                    justify_content: JustifyContent::SpaceBetween,
-                    padding: UiRect {
-                        top: Val::Percent(1.),
-                        bottom: Val::Percent(1.),
-                        left: Val::Percent(5.),
-                        right: Val::Percent(5.),
+            .spawn((
+                NodeBundle {
+                    background_color: Color::DARK_GRAY.into(),
+                    style: Style {
+                        flex_direction: FlexDirection::Column,
+                        align_content: AlignContent::Center,
+                        justify_content: JustifyContent::SpaceBetween,
+                        padding: UiRect {
+                            top: Val::Percent(1.),
+                            bottom: Val::Percent(1.),
+                            left: Val::Percent(5.),
+                            right: Val::Percent(5.),
+                        },
+                        size: Size::height(Val::Percent(100.)),
+                        align_self: AlignSelf::End,
+                        ..default()
                     },
-                    size: Size::height(Val::Percent(100.)),
-                    align_self: AlignSelf::End,
                     ..default()
                 },
-                ..default()
-            })
+                Sidebar,
+            ))
             .id();
 
         let title = commands
@@ -107,7 +116,6 @@ impl Sidebar {
                     justify_content: JustifyContent::SpaceBetween,
                     ..default()
                 },
-                background_color: Color::BLUE.into(),
                 ..default()
             },))
             .id();
@@ -136,12 +144,12 @@ impl Sidebar {
                         background_color: Color::GREEN.into(),
                         ..default()
                     },
-                    event: EventButton::<UpgradeAndPickSelectedTower>::new(),
+                    event: EventButton::<RefineAndPickSelectedTower>::new(),
                 },))
                 .id(),
             commands
-                .spawn((
-                    ButtonBundle {
+                .spawn((EventButtonBundle {
+                    button: ButtonBundle {
                         style: Style {
                             size: Size::all(Val::Px(50.)),
                             ..default()
@@ -149,8 +157,8 @@ impl Sidebar {
                         background_color: Color::TEAL.into(),
                         ..default()
                     },
-                    EventButton::<RemoveSelectedTower>::new(),
-                ))
+                    event: EventButton::<RemoveSelectedTower>::new(),
+                },))
                 .id(),
             commands
                 .spawn((
@@ -162,7 +170,7 @@ impl Sidebar {
                         background_color: Color::YELLOW.into(),
                         ..default()
                     },
-                    UpgradeChanceButton,
+                    RefineChanceButton,
                 ))
                 .id(),
         ];
@@ -178,7 +186,7 @@ impl Sidebar {
         commands.entity(button_bar).push_children(&buttons);
     }
 
-    fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<Sidebar>>) {
+    fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<SidebarFullscreen>>) {
         for sidebar in &sidebar {
             commands.entity(sidebar).despawn_recursive();
         }
@@ -186,12 +194,12 @@ impl Sidebar {
 }
 
 #[derive(Component)]
-struct UpgradeChanceButton;
+struct RefineChanceButton;
 
-impl UpgradeChanceButton {
+impl RefineChanceButton {
     fn interaction(
         mut random_level: ResMut<RandomLevel>,
-        buttons: Query<&Interaction, (With<UpgradeChanceButton>, Changed<Interaction>)>,
+        buttons: Query<&Interaction, (With<RefineChanceButton>, Changed<Interaction>)>,
     ) {
         for interaction in &buttons {
             if let Interaction::Clicked = interaction {
@@ -285,6 +293,86 @@ fn event_buttons<T: Default + Send + Sync + 'static>(
     for interaction in &buttons {
         if let Interaction::Clicked = interaction {
             events.send(T::default());
+        }
+    }
+}
+
+fn show_pickable_button(
+    selected: Option<Res<SelectedTower>>,
+    mut buttons: Query<(&mut Style, &mut Visibility), With<EventButton<PickSelectedTower>>>,
+) {
+    if let Some(selected) = selected {
+        if selected.is_changed() {
+            for (mut style, mut visibility) in &mut buttons {
+                (style.display, *visibility) = if selected.pickable {
+                    (Display::Flex, Visibility::Inherited)
+                } else {
+                    (Display::None, Visibility::Hidden)
+                }
+            }
+        }
+    } else {
+        for (mut style, mut visibility) in &mut buttons {
+            style.display = Display::None;
+            *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+fn show_refine_and_pick_button(
+    selected: Option<Res<SelectedTower>>,
+    mut buttons: Query<
+        (&mut Style, &mut Visibility),
+        With<EventButton<RefineAndPickSelectedTower>>,
+    >,
+) {
+    if let Some(selected) = selected {
+        if selected.is_changed() {
+            for (mut style, mut visibility) in &mut buttons {
+                (style.display, *visibility) = if selected.refinable {
+                    (Display::Flex, Visibility::Inherited)
+                } else {
+                    (Display::None, Visibility::Hidden)
+                }
+            }
+        }
+    } else {
+        for (mut style, mut visibility) in &mut buttons {
+            style.display = Display::None;
+            *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+fn show_remove_button(
+    selected: Option<Res<SelectedTower>>,
+    phase: Res<State<Phase>>,
+    mut buttons: Query<(&mut Style, &mut Visibility), With<EventButton<RemoveSelectedTower>>>,
+) {
+    match phase.0 {
+        Phase::Build | Phase::Pick => {
+            if let Some(selected) = selected {
+                if selected.is_changed() {
+                    for (mut style, mut visibility) in &mut buttons {
+                        (style.display, *visibility) = if selected.removable {
+                            (Display::Flex, Visibility::Inherited)
+                        } else {
+                            (Display::None, Visibility::Hidden)
+                        }
+                    }
+                }
+            } else {
+                for (mut style, mut visibility) in &mut buttons {
+                    style.display = Display::None;
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+        Phase::Spawn => {
+            for (mut style, mut visibility) in &mut buttons {
+                style.display = Display::None;
+                *visibility = Visibility::Hidden;
+            }
         }
     }
 }

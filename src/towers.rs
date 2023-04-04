@@ -316,7 +316,7 @@ impl Tower {
         }
     }
 
-    pub fn get_upgrade(self) -> Self {
+    pub fn get_refine(self) -> Self {
         match self {
             Tower::GemTower { typ, quality } => Self::GemTower {
                 typ,
@@ -325,7 +325,7 @@ impl Tower {
                     GemQuality::Flawed => GemQuality::Normal,
                     GemQuality::Normal => GemQuality::Flawless,
                     GemQuality::Flawless => GemQuality::Perfect,
-                    GemQuality::Perfect => unimplemented!("Cannot upgrade perfect gems"),
+                    GemQuality::Perfect => unimplemented!("Cannot refine perfect gems"),
                 },
             },
             Tower::Dirt => self,
@@ -727,11 +727,17 @@ impl PickSelectedTower {
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         mut next_phase: ResMut<NextState<Phase>>,
-        selected: Option<Res<SelectedTower>>,
+        mut selected: Option<ResMut<SelectedTower>>,
         just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            if let Some(SelectedTower { tower }) = selected.as_deref() {
+            if let Some(SelectedTower {
+                tower, pickable, ..
+            }) = selected.as_deref_mut()
+            {
+                if !*pickable {
+                    continue;
+                }
                 for (entity, transform) in &just_built {
                     if entity == *tower {
                         commands.entity(entity).remove::<JustBuilt>();
@@ -753,6 +759,7 @@ impl PickSelectedTower {
                         ));
                     }
                 }
+                *pickable = false;
                 next_phase.set(Phase::Spawn);
             }
         }
@@ -771,7 +778,13 @@ impl RemoveSelectedTower {
         towers: Query<(&Tower, &GlobalTransform), Without<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            if let Some(SelectedTower { tower }) = selected.as_deref() {
+            if let Some(SelectedTower {
+                tower, removable, ..
+            }) = selected.as_deref()
+            {
+                if !removable {
+                    continue;
+                }
                 if let Ok((Tower::Dirt, transform)) = towers.get(*tower) {
                     commands.entity(*tower).despawn_recursive();
 
@@ -791,23 +804,29 @@ impl RemoveSelectedTower {
 pub struct JustBuilt;
 
 #[derive(Default)]
-pub struct UpgradeAndPickSelectedTower;
+pub struct RefineAndPickSelectedTower;
 
-impl UpgradeAndPickSelectedTower {
-    pub fn upgrade_and_pick(
+impl RefineAndPickSelectedTower {
+    pub fn refine_and_pick(
         mut commands: Commands,
-        mut upgrade_events: EventReader<UpgradeAndPickSelectedTower>,
+        mut refine_events: EventReader<RefineAndPickSelectedTower>,
         mut pick_events: EventWriter<PickSelectedTower>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         selected: Option<Res<SelectedTower>>,
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
-        for _ in upgrade_events.iter() {
-            if let Some(SelectedTower { tower }) = selected.as_deref() {
+        for _ in refine_events.iter() {
+            if let Some(SelectedTower {
+                tower, refinable, ..
+            }) = selected.as_deref()
+            {
+                if !refinable {
+                    continue;
+                }
                 if let Ok((old_tower, tower_pos, tower)) = towers.get(*tower) {
                     commands.entity(old_tower).despawn_recursive();
-                    match tower.get_upgrade() {
+                    match tower.get_refine() {
                         Tower::GemTower { typ, quality } => {
                             let new_tower = Tower::GemTower { typ, quality };
                             let cooldown: Cooldown = new_tower.into();
@@ -830,10 +849,15 @@ impl UpgradeAndPickSelectedTower {
                                 SpeedModifiers::default(),
                                 JustBuilt,
                             )));
-                            commands.insert_resource(SelectedTower { tower: new_tower });
+                            commands.insert_resource(SelectedTower {
+                                tower: new_tower,
+                                pickable: true,
+                                refinable: false,
+                                removable: false,
+                            });
                             pick_events.send(PickSelectedTower);
                         }
-                        Tower::Dirt => println!("Can't upgrade and pick dirt"),
+                        Tower::Dirt => println!("Can't refine and pick dirt"),
                     }
                 }
             }
@@ -844,22 +868,22 @@ impl UpgradeAndPickSelectedTower {
 #[derive(Default, Deref, DerefMut, Resource)]
 pub struct RandomLevel(u32);
 
-pub struct Upgrade(pub Entity);
+pub struct Refine(pub Entity);
 
-impl Upgrade {
-    pub fn upgrade(
+impl Refine {
+    pub fn refine(
         mut commands: Commands,
-        mut upgrade_events: EventReader<Upgrade>,
+        mut refine_events: EventReader<Refine>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
-        for Upgrade(entity) in upgrade_events.iter() {
+        for Refine(entity) in refine_events.iter() {
             if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
                 match tower {
                     Tower::GemTower { typ, .. } => {
                         commands.entity(old_tower).despawn_recursive();
-                        let new_tower = tower.get_upgrade();
+                        let new_tower = tower.get_refine();
                         let cooldown: Cooldown = new_tower.into();
                         new_tower.add_abilities(&mut commands.spawn((
                             PbrBundle {
@@ -901,7 +925,7 @@ impl Upgrade {
                             ));
                         }
                     }
-                    Tower::Dirt => println!("Can't upgrade dirt"),
+                    Tower::Dirt => println!("Can't refine dirt"),
                 }
             }
         }

@@ -159,3 +159,13 @@ pub fn get_squares_from_pos(position: Vec2) -> [Vec2; 4] {
         Vec2::new(top_corner_position.x + 1., top_corner_position.y + 1.),
     ]
 }
+
+pub fn position_within_rect(position: Vec2, rect_size: Vec2, rect_position: Vec2) -> bool {
+    let left = rect_position.x - rect_size.x / 2.;
+    let right = rect_position.x + rect_size.x / 2.;
+    let top = rect_position.y - rect_size.y / 2.;
+    let bottom = rect_position.x + rect_size.x / 2.;
+    let within_width = position.x >= left && position.x <= right;
+    let within_height = position.y >= top && position.y <= bottom;
+    within_height && within_width
+}
