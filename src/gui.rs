@@ -21,7 +21,8 @@ impl Plugin for GameGuiPlugin {
                 event_buttons::<RefineAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
                 event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Pick)),
                 event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Build)),
-                RefineChanceButton::interaction,
+                UpgradeChanceButton::interaction,
+                UpgradeChanceButton::update,
                 SelectedText::on_update,
                 show_pickable_button,
                 show_refine_and_pick_button,
@@ -37,7 +38,7 @@ pub struct SidebarFullscreen;
 pub struct Sidebar;
 
 impl SidebarFullscreen {
-    pub fn spawn(mut commands: Commands, ass: Res<AssetServer>) {
+    pub fn spawn(mut commands: Commands, ass: Res<AssetServer>, upgrade_chance: Res<RandomLevel>) {
         let full_screen = commands
             .spawn((
                 NodeBundle {
@@ -113,11 +114,28 @@ impl SidebarFullscreen {
             .spawn((NodeBundle {
                 style: Style {
                     flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
+                    justify_content: JustifyContent::Center,
                     ..default()
                 },
                 ..default()
             },))
+            .id();
+
+        let upgrade_chance_button_text = commands
+            .spawn((
+                TextBundle {
+                    text: Text::from_section(
+                        format!("{}", **upgrade_chance),
+                        TextStyle {
+                            font: ass.load("Mukta-Regular.ttf"),
+                            font_size: 40.,
+                            color: Color::BLACK,
+                        },
+                    ),
+                    ..default()
+                },
+                UpgradeChanceButtonText,
+            ))
             .id();
 
         let buttons = [
@@ -165,13 +183,16 @@ impl SidebarFullscreen {
                     ButtonBundle {
                         style: Style {
                             size: Size::all(Val::Px(50.)),
+                            align_content: AlignContent::Center,
+                            justify_content: JustifyContent::Center,
                             ..default()
                         },
                         background_color: Color::YELLOW.into(),
                         ..default()
                     },
-                    RefineChanceButton,
+                    UpgradeChanceButton,
                 ))
+                .add_child(upgrade_chance_button_text)
                 .id(),
         ];
 
@@ -194,16 +215,38 @@ impl SidebarFullscreen {
 }
 
 #[derive(Component)]
-struct RefineChanceButton;
+struct UpgradeChanceButton;
 
-impl RefineChanceButton {
+#[derive(Component)]
+struct UpgradeChanceButtonText;
+
+impl UpgradeChanceButton {
     fn interaction(
         mut random_level: ResMut<RandomLevel>,
-        buttons: Query<&Interaction, (With<RefineChanceButton>, Changed<Interaction>)>,
+        buttons: Query<&Interaction, (With<UpgradeChanceButton>, Changed<Interaction>)>,
     ) {
         for interaction in &buttons {
             if let Interaction::Clicked = interaction {
                 **random_level += 1;
+            }
+        }
+    }
+
+    fn update(
+        ass: Res<AssetServer>,
+        random_level: Res<RandomLevel>,
+        mut text: Query<&mut Text, With<UpgradeChanceButtonText>>,
+    ) {
+        if random_level.is_changed() {
+            for mut text in &mut text {
+                *text = Text::from_section(
+                    format!("{}", **random_level),
+                    TextStyle {
+                        font: ass.load("Mukta-Regular.ttf"),
+                        font_size: 40.,
+                        color: Color::BLACK,
+                    },
+                );
             }
         }
     }
