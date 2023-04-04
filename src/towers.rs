@@ -458,7 +458,7 @@ impl From<Tower> for LaserAttack {
                     (GemType::Topaz, GemQuality::Perfect) => Damage::Fixed(75),
                 },
                 hits: match typ {
-                    GemType::Ruby => Hits::Ground,
+                    GemType::Diamond => Hits::Ground,
                     GemType::Amethyst => Hits::Flying,
                     _ => Hits::All,
                 },
