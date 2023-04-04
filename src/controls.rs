@@ -190,8 +190,10 @@ pub fn build_on_click(
     }
 }
 
-#[derive(Deref, DerefMut, Resource)]
-pub struct SelectedTower(pub Entity);
+#[derive(Resource)]
+pub struct SelectedTower {
+    pub tower: Entity,
+}
 
 impl SelectedTower {
     pub fn selection(
@@ -215,7 +217,9 @@ impl SelectedTower {
                     }
 
                     if let Some(picked_tower) = picked_tower {
-                        commands.insert_resource(SelectedTower(picked_tower));
+                        commands.insert_resource(SelectedTower {
+                            tower: picked_tower,
+                        });
                     } else {
                         commands.remove_resource::<SelectedTower>();
                     }

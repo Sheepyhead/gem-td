@@ -731,9 +731,9 @@ impl PickSelectedTower {
         just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            if let Some(SelectedTower(selected_tower)) = selected.as_deref() {
+            if let Some(SelectedTower { tower }) = selected.as_deref() {
                 for (entity, transform) in &just_built {
-                    if entity == *selected_tower {
+                    if entity == *tower {
                         commands.entity(entity).remove::<JustBuilt>();
                     } else {
                         commands.entity(entity).despawn_recursive();
@@ -771,9 +771,9 @@ impl RemoveSelectedTower {
         towers: Query<(&Tower, &GlobalTransform), Without<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            if let Some(SelectedTower(selected_tower)) = selected.as_deref() {
-                if let Ok((Tower::Dirt, transform)) = towers.get(*selected_tower) {
-                    commands.entity(*selected_tower).despawn_recursive();
+            if let Some(SelectedTower { tower }) = selected.as_deref() {
+                if let Ok((Tower::Dirt, transform)) = towers.get(*tower) {
+                    commands.entity(*tower).despawn_recursive();
 
                     #[allow(clippy::cast_sign_loss)]
                     let positions = get_squares_from_pos(transform.translation().xz())
@@ -804,8 +804,8 @@ impl UpgradeAndPickSelectedTower {
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
         for _ in upgrade_events.iter() {
-            if let Some(SelectedTower(selected_tower)) = selected.as_deref() {
-                if let Ok((old_tower, tower_pos, tower)) = towers.get(*selected_tower) {
+            if let Some(SelectedTower { tower }) = selected.as_deref() {
+                if let Ok((old_tower, tower_pos, tower)) = towers.get(*tower) {
                     commands.entity(old_tower).despawn_recursive();
                     match tower.get_upgrade() {
                         Tower::GemTower { typ, quality } => {
@@ -830,7 +830,7 @@ impl UpgradeAndPickSelectedTower {
                                 SpeedModifiers::default(),
                                 JustBuilt,
                             )));
-                            commands.insert_resource(SelectedTower(new_tower));
+                            commands.insert_resource(SelectedTower { tower: new_tower });
                             pick_events.send(PickSelectedTower);
                         }
                         Tower::Dirt => println!("Can't upgrade and pick dirt"),
