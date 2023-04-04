@@ -20,6 +20,7 @@ use bevy::{
     prelude::{shape::Plane, *},
     window::WindowResolution,
 };
+use bevy_debug_grid::DebugGridPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_debug_lines::DebugLinesPlugin;
 use bevy_rapier3d::prelude::*;
@@ -82,6 +83,7 @@ fn main() {
         .add_plugin(MapNavPlugin::<CreepPos>::default())
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugin(DebugGridPlugin::with_floor_grid())
         // Internal plugins
         .add_state::<Phase>()
         .add_event::<Hit>()
