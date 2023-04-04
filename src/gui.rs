@@ -1,8 +1,10 @@
+use std::marker::PhantomData;
+
 use bevy::prelude::*;
 
 use crate::{
     controls::SelectedTower,
-    towers::{Cooldown, LaserAttack, PickTower, RandomLevel, UpgradeAndPick},
+    towers::{Cooldown, LaserAttack, PickSelectedTower, RandomLevel, UpgradeAndPickSelectedTower},
 };
 
 pub struct GameGuiPlugin;
@@ -10,8 +12,8 @@ pub struct GameGuiPlugin;
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_systems((Sidebar::spawn,)).add_systems((
-            PickGemButton::interaction,
-            UpgradeAndPickButton::interaction,
+            event_buttons::<PickSelectedTower>,
+            event_buttons::<UpgradeAndPickSelectedTower>,
             UpgradeChanceButton::interaction,
             SelectedText::on_update,
         ));
@@ -104,8 +106,8 @@ impl Sidebar {
             .id();
 
         let pick_button = commands
-            .spawn((
-                ButtonBundle {
+            .spawn((EventButtonBundle {
+                button: ButtonBundle {
                     style: Style {
                         size: Size::all(Val::Px(50.)),
                         ..default()
@@ -113,13 +115,13 @@ impl Sidebar {
                     background_color: Color::PINK.into(),
                     ..default()
                 },
-                PickGemButton,
-            ))
+                event: EventButton::<PickSelectedTower>::new(),
+            },))
             .id();
 
         let combine_button = commands
-            .spawn((
-                ButtonBundle {
+            .spawn((EventButtonBundle {
+                button: ButtonBundle {
                     style: Style {
                         size: Size::all(Val::Px(50.)),
                         ..default()
@@ -127,8 +129,8 @@ impl Sidebar {
                     background_color: Color::GREEN.into(),
                     ..default()
                 },
-                UpgradeAndPickButton,
-            ))
+                event: EventButton::<UpgradeAndPickSelectedTower>::new(),
+            },))
             .id();
         let upgrade_chance_button = commands
             .spawn((
@@ -175,44 +177,6 @@ impl Sidebar {
     fn _despawn(mut commands: Commands, sidebar: Query<Entity, With<Sidebar>>) {
         for sidebar in &sidebar {
             commands.entity(sidebar).despawn_recursive();
-        }
-    }
-}
-
-#[derive(Component)]
-struct PickGemButton;
-
-impl PickGemButton {
-    fn interaction(
-        mut events: EventWriter<PickTower>,
-        selected: Res<SelectedTower>,
-        buttons: Query<&Interaction, (With<PickGemButton>, Changed<Interaction>)>,
-    ) {
-        for interaction in &buttons {
-            if let Interaction::Clicked = interaction {
-                if let Some(selected) = **selected {
-                    events.send(PickTower(selected));
-                }
-            }
-        }
-    }
-}
-
-#[derive(Component)]
-struct UpgradeAndPickButton;
-
-impl UpgradeAndPickButton {
-    fn interaction(
-        mut events: EventWriter<UpgradeAndPick>,
-        selected: Res<SelectedTower>,
-        buttons: Query<&Interaction, (With<UpgradeAndPickButton>, Changed<Interaction>)>,
-    ) {
-        for interaction in &buttons {
-            if let Interaction::Clicked = interaction {
-                if let Some(selected) = **selected {
-                    events.send(UpgradeAndPick(selected));
-                }
-            }
         }
     }
 }
@@ -287,6 +251,33 @@ impl SelectedText {
                     *text = text_section;
                 }
             }
+        }
+    }
+}
+
+#[derive(Bundle)]
+struct EventButtonBundle<T: Default + Send + Sync + 'static> {
+    #[bundle]
+    button: ButtonBundle,
+    event: EventButton<T>,
+}
+
+#[derive(Component)]
+struct EventButton<T: Default>(PhantomData<T>);
+
+impl<T: Default> EventButton<T> {
+    pub fn new() -> Self {
+        Self(PhantomData::default())
+    }
+}
+
+fn event_buttons<T: Default + Send + Sync + 'static>(
+    mut events: EventWriter<T>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<EventButton<T>>)>,
+) {
+    for interaction in &buttons {
+        if let Interaction::Clicked = interaction {
+            events.send(T::default());
         }
     }
 }

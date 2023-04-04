@@ -10,6 +10,7 @@ use seldom_map_nav::prelude::*;
 
 use crate::{
     common::get_squares_from_pos,
+    controls::SelectedTower,
     creeps::{Creep, CreepType, Hit, HitPoints},
     tower_abilities::{
         Aura, AuraType, CritOnHit, SapphireSlowOnHit, SlowPoisonOnHit, SpeedModifiers, SplashOnHit,
@@ -462,7 +463,7 @@ impl From<Tower> for LaserAttack {
                     _ => Hits::All,
                 },
             },
-            Tower::Dirt => todo!(),
+            Tower::Dirt => unimplemented!(),
         }
     }
 }
@@ -716,40 +717,44 @@ impl Display for Damage {
     }
 }
 
-pub struct PickTower(pub Entity);
+#[derive(Default)]
+pub struct PickSelectedTower;
 
-impl PickTower {
+impl PickSelectedTower {
     pub fn pick_building(
         mut commands: Commands,
-        mut events: EventReader<PickTower>,
+        mut events: EventReader<PickSelectedTower>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
         mut next_phase: ResMut<NextState<Phase>>,
+        selected: Res<SelectedTower>,
         just_built: Query<(Entity, &GlobalTransform), With<JustBuilt>>,
     ) {
-        for PickTower(picked_tower) in events.iter() {
-            for (entity, transform) in &just_built {
-                if entity == *picked_tower {
-                    commands.entity(entity).remove::<JustBuilt>();
-                } else {
-                    commands.entity(entity).despawn_recursive();
-                    commands.spawn((
-                        PbrBundle {
-                            mesh: meshes.add(Tower::Dirt.into()),
-                            material: mats.add(Color::ORANGE_RED.into()),
-                            transform: Transform::from_xyz(
-                                transform.compute_transform().translation.x,
-                                Tower::Dirt.get_y_offset(),
-                                transform.compute_transform().translation.z,
-                            ),
-                            ..default()
-                        },
-                        Name::new("Dirt"),
-                        Tower::Dirt,
-                    ));
+        for _ in events.iter() {
+            if let Some(picked_tower) = **selected {
+                for (entity, transform) in &just_built {
+                    if entity == picked_tower {
+                        commands.entity(entity).remove::<JustBuilt>();
+                    } else {
+                        commands.entity(entity).despawn_recursive();
+                        commands.spawn((
+                            PbrBundle {
+                                mesh: meshes.add(Tower::Dirt.into()),
+                                material: mats.add(Color::ORANGE_RED.into()),
+                                transform: Transform::from_xyz(
+                                    transform.compute_transform().translation.x,
+                                    Tower::Dirt.get_y_offset(),
+                                    transform.compute_transform().translation.z,
+                                ),
+                                ..default()
+                            },
+                            Name::new("Dirt"),
+                            Tower::Dirt,
+                        ));
+                    }
                 }
+                next_phase.set(Phase::Spawn);
             }
-            next_phase.set(Phase::Spawn);
         }
     }
 }
@@ -782,46 +787,51 @@ impl RemoveTower {
 #[derive(Component)]
 pub struct JustBuilt;
 
-pub struct UpgradeAndPick(pub Entity);
+#[derive(Default)]
+pub struct UpgradeAndPickSelectedTower;
 
-impl UpgradeAndPick {
+impl UpgradeAndPickSelectedTower {
     pub fn upgrade_and_pick(
         mut commands: Commands,
-        mut upgrade_events: EventReader<UpgradeAndPick>,
-        mut pick_events: EventWriter<PickTower>,
+        mut upgrade_events: EventReader<UpgradeAndPickSelectedTower>,
+        mut pick_events: EventWriter<PickSelectedTower>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut mats: ResMut<Assets<StandardMaterial>>,
+        mut selected: ResMut<SelectedTower>,
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
     ) {
-        for UpgradeAndPick(entity) in upgrade_events.iter() {
-            if let Ok((old_tower, tower_pos, tower)) = towers.get(*entity) {
-                commands.entity(old_tower).despawn_recursive();
-                match tower.get_upgrade() {
-                    Tower::GemTower { typ, quality } => {
-                        let new_tower = Tower::GemTower { typ, quality };
-                        let cooldown: Cooldown = new_tower.into();
-                        let new_tower = new_tower.add_abilities(&mut commands.spawn((
-                            PbrBundle {
-                                mesh: meshes.add(new_tower.into()),
-                                material: mats.add(typ.into()),
-                                transform: Transform::from_xyz(
-                                    tower_pos.compute_transform().translation.x,
-                                    new_tower.get_y_offset(),
-                                    tower_pos.compute_transform().translation.z,
-                                ),
-                                ..default()
-                            },
-                            Name::new(new_tower.to_string()),
-                            new_tower,
-                            LaserAttack::from(new_tower),
-                            cooldown,
-                            Target::Single(None),
-                            SpeedModifiers::default(),
-                            JustBuilt,
-                        )));
-                        pick_events.send(PickTower(new_tower));
+        for _ in upgrade_events.iter() {
+            if let Some(picked_tower) = **selected {
+                if let Ok((old_tower, tower_pos, tower)) = towers.get(picked_tower) {
+                    commands.entity(old_tower).despawn_recursive();
+                    match tower.get_upgrade() {
+                        Tower::GemTower { typ, quality } => {
+                            let new_tower = Tower::GemTower { typ, quality };
+                            let cooldown: Cooldown = new_tower.into();
+                            let new_tower = new_tower.add_abilities(&mut commands.spawn((
+                                PbrBundle {
+                                    mesh: meshes.add(new_tower.into()),
+                                    material: mats.add(typ.into()),
+                                    transform: Transform::from_xyz(
+                                        tower_pos.compute_transform().translation.x,
+                                        new_tower.get_y_offset(),
+                                        tower_pos.compute_transform().translation.z,
+                                    ),
+                                    ..default()
+                                },
+                                Name::new(new_tower.to_string()),
+                                new_tower,
+                                LaserAttack::from(new_tower),
+                                cooldown,
+                                Target::Single(None),
+                                SpeedModifiers::default(),
+                                JustBuilt,
+                            )));
+                            **selected = Some(new_tower);
+                            pick_events.send(PickSelectedTower);
+                        }
+                        Tower::Dirt => println!("Can't upgrade and pick dirt"),
                     }
-                    Tower::Dirt => todo!(),
                 }
             }
         }
@@ -888,7 +898,7 @@ impl Upgrade {
                             ));
                         }
                     }
-                    Tower::Dirt => todo!(),
+                    Tower::Dirt => println!("Can't upgrade dirt"),
                 }
             }
         }

@@ -35,8 +35,8 @@ use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
-    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickTower, RandomLevel, RemoveTower,
-    Upgrade, UpgradeAndPick,
+    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel,
+    RemoveTower, Upgrade, UpgradeAndPickSelectedTower,
 };
 
 mod common;
@@ -86,9 +86,9 @@ fn main() {
         .add_state::<Phase>()
         .add_event::<Hit>()
         .add_event::<Dead>()
-        .add_event::<PickTower>()
+        .add_event::<PickSelectedTower>()
         .add_event::<RemoveTower>()
-        .add_event::<UpgradeAndPick>()
+        .add_event::<UpgradeAndPickSelectedTower>()
         .add_event::<Upgrade>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
@@ -121,13 +121,13 @@ fn main() {
             rebuild_navmesh.in_schedule(OnExit(Phase::Pick)),
             uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
             remove_highlight.in_schedule(OnExit(Phase::Build)),
-            PickTower::pick_building.in_set(OnUpdate(Phase::Pick)),
+            PickSelectedTower::pick_building.in_set(OnUpdate(Phase::Pick)),
             next_level.in_schedule(OnExit(Phase::Spawn)),
             Slow::change.in_set(OnUpdate(Phase::Spawn)),
             LaserAttack::update_multiple_targets,
             SelectedTower::selection,
             RemoveTower::remove,
-            UpgradeAndPick::upgrade_and_pick,
+            UpgradeAndPickSelectedTower::upgrade_and_pick,
             Upgrade::upgrade,
         ))
         .run();
