@@ -219,6 +219,8 @@ impl SelectedTower {
                     } else {
                         **selected = None;
                     }
+                } else {
+                    **selected = None;
                 }
             }
         }
