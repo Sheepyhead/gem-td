@@ -103,7 +103,7 @@ pub fn rebuild_navmesh(
     );
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum GemType {
     Emerald,
     Ruby,
@@ -115,7 +115,7 @@ pub enum GemType {
     Topaz,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum GemQuality {
     Chipped,
     Flawed,
@@ -201,32 +201,66 @@ impl From<GemType> for Color {
 
 impl GemType {
     pub fn random() -> Self {
-        match fastrand::u8(0..8) {
+        match fastrand::u8(0..3) {
             0 => GemType::Emerald,
-            1 => GemType::Ruby,
-            2 => GemType::Sapphire,
-            3 => GemType::Diamond,
-            4 => GemType::Amethyst,
-            5 => GemType::Opal,
-            6 => GemType::Aquamarine,
-            7 => GemType::Topaz,
+            1 => GemType::Aquamarine,
+            2 => GemType::Opal,
             _ => panic!("Gem type larger than 6, this cannot happen"),
         }
+        // match fastrand::u8(0..8) {
+        //     0 => GemType::Emerald,
+        //     1 => GemType::Ruby,
+        //     2 => GemType::Sapphire,
+        //     3 => GemType::Diamond,
+        //     4 => GemType::Amethyst,
+        //     5 => GemType::Opal,
+        //     6 => GemType::Aquamarine,
+        //     7 => GemType::Topaz,
+        //     _ => panic!("Gem type larger than 6, this cannot happen"),
+        // }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum SpecialTowerType {
     Malachite(u32),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct SpecialTowerRecipe {
+#[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
+pub struct SpecialTowerRecipe {
     typ: SpecialTowerType,
     ingredients: Vec<Tower>,
 }
 
-#[derive(Resource)]
+pub struct UpdateFulfillableSpecialTowerRecipes;
+
+impl UpdateFulfillableSpecialTowerRecipes {
+    pub fn fire(mut events: EventWriter<UpdateFulfillableSpecialTowerRecipes>) {
+        events.send(Self);
+    }
+
+    pub fn run(
+        mut events: EventReader<UpdateFulfillableSpecialTowerRecipes>,
+        mut fulfillable: ResMut<FulfillableSpecialTowerRecipes>,
+        recipes: Res<SpecialTowerRecipes>,
+        phase: Res<State<Phase>>,
+        towers: Query<&Tower, Without<JustBuilt>>,
+        just_built_towers: Query<&Tower, With<JustBuilt>>,
+    ) {
+        for _ in events.iter() {
+            **fulfillable = dbg!(recipes.get_fulfilled_recipes(match phase.0 {
+                Phase::Pick => just_built_towers.iter().collect(),
+                Phase::Spawn => towers.iter().collect(),
+                Phase::Build => unimplemented!(),
+            }));
+        }
+    }
+}
+
+#[derive(Default, Resource, Deref, DerefMut, Reflect, FromReflect)]
+pub struct FulfillableSpecialTowerRecipes(Vec<SpecialTowerRecipe>);
+
+#[derive(Resource, Deref, DerefMut)]
 pub struct SpecialTowerRecipes(Vec<SpecialTowerRecipe>);
 
 impl Default for SpecialTowerRecipes {
@@ -234,6 +268,7 @@ impl Default for SpecialTowerRecipes {
         use GemQuality::*;
         use GemType::*;
         use SpecialTowerType::*;
+
         Self(vec![SpecialTowerRecipe {
             typ: Malachite(0),
             ingredients: vec![
@@ -255,21 +290,21 @@ impl Default for SpecialTowerRecipes {
 }
 
 impl SpecialTowerRecipes {
-    fn get_fulfilled_recipes(&self, towers: Vec<Tower>) -> Vec<SpecialTowerRecipe> {
+    fn get_fulfilled_recipes(&self, towers: Vec<&Tower>) -> Vec<SpecialTowerRecipe> {
         self.0
             .iter()
             .filter(|recipe| {
                 recipe
                     .ingredients
                     .iter()
-                    .all(|tower| towers.contains(tower))
+                    .all(|tower| towers.contains(&tower))
             })
             .cloned()
             .collect()
     }
 }
 
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub enum Tower {
     Gem { typ: GemType, quality: GemQuality },
     Special(SpecialTowerType),

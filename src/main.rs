@@ -21,7 +21,7 @@ use bevy::{
     window::WindowResolution,
 };
 use bevy_debug_grid::DebugGridPlugin;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_inspector_egui::quick::{ResourceInspectorPlugin, WorldInspectorPlugin};
 use bevy_prototype_debug_lines::DebugLinesPlugin;
 use bevy_rapier3d::prelude::*;
 use common::{
@@ -36,8 +36,9 @@ use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
-    rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel,
-    RefineAndPickSelectedTower, RemoveSelectedTower, SpecialTowerRecipes,
+    rebuild_navmesh, uncover_dirt, BuildGrid, FulfillableSpecialTowerRecipes, LaserAttack,
+    PickSelectedTower, RandomLevel, RefineAndPickSelectedTower, RemoveSelectedTower,
+    SpecialTowerRecipes, UpdateFulfillableSpecialTowerRecipes,
 };
 
 mod common;
@@ -91,6 +92,7 @@ fn main() {
         .add_event::<PickSelectedTower>()
         .add_event::<RemoveSelectedTower>()
         .add_event::<RefineAndPickSelectedTower>()
+        .add_event::<UpdateFulfillableSpecialTowerRecipes>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
@@ -98,6 +100,9 @@ fn main() {
         .init_resource::<RandomLevel>()
         .init_resource::<CursorOverGui>()
         .init_resource::<SpecialTowerRecipes>()
+        .init_resource::<FulfillableSpecialTowerRecipes>()
+        .register_type::<FulfillableSpecialTowerRecipes>()
+        .add_plugin(ResourceInspectorPlugin::<FulfillableSpecialTowerRecipes>::default())
         .add_plugin(TowerAbilitiesPlugin)
         .add_plugin(GameGuiPlugin)
         .add_startup_system(startup)
@@ -131,7 +136,10 @@ fn main() {
             RemoveSelectedTower::remove,
             RefineAndPickSelectedTower::refine_and_pick,
             cursor_over_gui,
+            UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Build)),
+            UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Pick)),
         ))
+        .add_systems((UpdateFulfillableSpecialTowerRecipes::run,))
         .run();
 }
 
