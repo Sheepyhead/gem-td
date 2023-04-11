@@ -37,7 +37,7 @@ use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
     rebuild_navmesh, uncover_dirt, BuildGrid, LaserAttack, PickSelectedTower, RandomLevel,
-    RefineAndPickSelectedTower, RemoveSelectedTower,
+    RefineAndPickSelectedTower, RemoveSelectedTower, SpecialTowerRecipes,
 };
 
 mod common;
@@ -97,6 +97,7 @@ fn main() {
         .init_resource::<BuildGrid>()
         .init_resource::<RandomLevel>()
         .init_resource::<CursorOverGui>()
+        .init_resource::<SpecialTowerRecipes>()
         .add_plugin(TowerAbilitiesPlugin)
         .add_plugin(GameGuiPlugin)
         .add_startup_system(startup)

@@ -58,7 +58,7 @@ pub fn uncover_dirt(
 ) {
     for (entity, pos) in &just_built {
         let typ = GemType::random();
-        let gem_tower = Tower::GemTower {
+        let gem_tower = Tower::Gem {
             typ,
             quality: GemQuality::random_with_modifier(**random_level),
         };
@@ -215,16 +215,71 @@ impl GemType {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpecialTowerType {
+    Malachite(u32),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SpecialTowerRecipe {
+    typ: SpecialTowerType,
+    ingredients: Vec<Tower>,
+}
+
+#[derive(Resource)]
+pub struct SpecialTowerRecipes(Vec<SpecialTowerRecipe>);
+
+impl Default for SpecialTowerRecipes {
+    fn default() -> Self {
+        use GemQuality::*;
+        use GemType::*;
+        use SpecialTowerType::*;
+        Self(vec![SpecialTowerRecipe {
+            typ: Malachite(0),
+            ingredients: vec![
+                Tower::Gem {
+                    typ: Opal,
+                    quality: Chipped,
+                },
+                Tower::Gem {
+                    typ: Emerald,
+                    quality: Chipped,
+                },
+                Tower::Gem {
+                    typ: Aquamarine,
+                    quality: Chipped,
+                },
+            ],
+        }])
+    }
+}
+
+impl SpecialTowerRecipes {
+    fn get_fulfilled_recipes(&self, towers: Vec<Tower>) -> Vec<SpecialTowerRecipe> {
+        self.0
+            .iter()
+            .filter(|recipe| {
+                recipe
+                    .ingredients
+                    .iter()
+                    .all(|tower| towers.contains(tower))
+            })
+            .cloned()
+            .collect()
+    }
+}
+
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tower {
-    GemTower { typ: GemType, quality: GemQuality },
+    Gem { typ: GemType, quality: GemQuality },
+    Special(SpecialTowerType),
     Dirt,
 }
 
 impl Tower {
     pub fn add_abilities(self, entity: &mut EntityCommands) -> Entity {
         match self {
-            Self::GemTower { typ, quality } => match (typ, quality) {
+            Self::Gem { typ, quality } => match (typ, quality) {
                 (GemType::Emerald, GemQuality::Chipped) => entity.insert(SlowPoisonOnHit {
                     dps: 2,
                     slow: 15,
@@ -292,13 +347,14 @@ impl Tower {
                 _ => entity,
             },
             Tower::Dirt => entity,
+            Tower::Special(_) => entity,
         }
         .id()
     }
 
     pub fn get_base_cooldown_time(self) -> f32 {
         match self {
-            Tower::GemTower { typ, quality } => match (typ, quality) {
+            Tower::Gem { typ, quality } => match (typ, quality) {
                 (GemType::Aquamarine, _) => BASE_TOWER_SPEED / 2.,
                 (
                     GemType::Topaz
@@ -313,12 +369,13 @@ impl Tower {
                 _ => BASE_TOWER_SPEED,
             },
             Tower::Dirt => BASE_TOWER_SPEED,
+            Tower::Special(_) => BASE_TOWER_SPEED,
         }
     }
 
     pub fn get_refine(self) -> Self {
         match self {
-            Tower::GemTower { typ, quality } => Self::GemTower {
+            Tower::Gem { typ, quality } => Self::Gem {
                 typ,
                 quality: match quality {
                     GemQuality::Chipped => GemQuality::Flawed,
@@ -328,13 +385,14 @@ impl Tower {
                     GemQuality::Perfect => unimplemented!("Cannot refine perfect gems"),
                 },
             },
-            Tower::Dirt => self,
+            Tower::Dirt => unimplemented!("Cannot refine dirt"),
+            Tower::Special(_) => unimplemented!("Cannot refine special towers"),
         }
     }
 
     pub fn get_y_offset(self) -> f32 {
         match self {
-            Tower::GemTower { quality, .. } => match quality {
+            Tower::Gem { quality, .. } => match quality {
                 GemQuality::Chipped => 0.2,
                 GemQuality::Flawed => 0.4,
                 GemQuality::Normal => 0.6,
@@ -342,6 +400,7 @@ impl Tower {
                 GemQuality::Perfect => 1.,
             },
             Tower::Dirt => 0.,
+            Tower::Special(_) => 0.,
         }
     }
 }
@@ -349,7 +408,7 @@ impl Tower {
 impl Display for Tower {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Tower::GemTower { typ, quality } => write!(
+            Tower::Gem { typ, quality } => write!(
                 f,
                 "{}{}",
                 match quality {
@@ -371,6 +430,7 @@ impl Display for Tower {
                 }
             ),
             Tower::Dirt => write!(f, "Dirt"),
+            Tower::Special(_) => write!(f, "Special tower"),
         }
     }
 }
@@ -379,7 +439,7 @@ impl From<Tower> for LaserAttack {
     #[allow(clippy::match_same_arms)]
     fn from(value: Tower) -> Self {
         match value {
-            Tower::GemTower { typ, quality } => Self {
+            Tower::Gem { typ, quality } => Self {
                 range: match (typ, quality) {
                     (GemType::Emerald, GemQuality::Chipped) => 5.,
                     (GemType::Emerald, GemQuality::Flawed) => 5.5,
@@ -464,6 +524,7 @@ impl From<Tower> for LaserAttack {
                 },
             },
             Tower::Dirt => unimplemented!(),
+            Tower::Special(_) => unimplemented!(),
         }
     }
 }
@@ -482,7 +543,7 @@ impl From<Tower> for Cooldown {
 impl From<Tower> for Mesh {
     fn from(value: Tower) -> Self {
         match value {
-            Tower::GemTower { quality, .. } => shape::Cube {
+            Tower::Gem { quality, .. } => shape::Cube {
                 size: match quality {
                     GemQuality::Chipped => 0.4,
                     GemQuality::Flawed => 0.8,
@@ -501,6 +562,7 @@ impl From<Tower> for Mesh {
                 max_z: 1.,
             }
             .into(),
+            Tower::Special(_) => todo!(),
         }
     }
 }
@@ -827,8 +889,8 @@ impl RefineAndPickSelectedTower {
                 if let Ok((old_tower, tower_pos, tower)) = towers.get(*tower) {
                     commands.entity(old_tower).despawn_recursive();
                     match tower.get_refine() {
-                        Tower::GemTower { typ, quality } => {
-                            let new_tower = Tower::GemTower { typ, quality };
+                        Tower::Gem { typ, quality } => {
+                            let new_tower = Tower::Gem { typ, quality };
                             let cooldown: Cooldown = new_tower.into();
                             let new_tower = new_tower.add_abilities(&mut commands.spawn((
                                 PbrBundle {
@@ -858,6 +920,7 @@ impl RefineAndPickSelectedTower {
                             pick_events.send(PickSelectedTower);
                         }
                         Tower::Dirt => println!("Can't refine and pick dirt"),
+                        Tower::Special(_) => println!("Can't refine and pick special tower"),
                     }
                 }
             }
