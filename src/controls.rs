@@ -9,7 +9,7 @@ use bevy_rapier3d::prelude::*;
 use crate::{
     common::{get_squares_from_pos, position_within_rect, ray_from_screenspace, Builds},
     gui::Sidebar,
-    towers::{BuildGrid, JustBuilt, Tower},
+    towers::{BuildGrid, FulfillableSpecialTowerRecipes, JustBuilt, Tower},
     Phase, WINDOW_HEIGHT,
 };
 
@@ -218,12 +218,14 @@ pub fn build_on_click(
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Resource)]
 pub struct SelectedTower {
     pub tower: Entity,
     pub pickable: bool,
     pub refinable: bool,
     pub removable: bool,
+    pub combinable: bool,
 }
 
 impl SelectedTower {
@@ -232,6 +234,7 @@ impl SelectedTower {
         mut mouse: EventReader<MouseButtonInput>,
         under_cursor: Res<UnderCursor>,
         cursor_over_gui: Res<CursorOverGui>,
+        fulfillable_recipes: Res<FulfillableSpecialTowerRecipes>,
         towers: Query<(Entity, &GlobalTransform, &Tower)>,
         just_built: Query<(), With<JustBuilt>>,
     ) {
@@ -267,6 +270,9 @@ impl SelectedTower {
                                 && towers
                                     .get_component::<Tower>(picked_tower)
                                     .is_ok_and(|tower| *tower == Tower::Dirt),
+                            combinable: fulfillable_recipes
+                                .iter()
+                                .any(|recipe| recipe.ingredients.contains(typ)),
                         });
                     } else {
                         commands.remove_resource::<SelectedTower>();

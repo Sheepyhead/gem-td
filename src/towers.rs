@@ -228,8 +228,8 @@ pub enum SpecialTowerType {
 
 #[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
 pub struct SpecialTowerRecipe {
-    typ: SpecialTowerType,
-    ingredients: Vec<Tower>,
+    pub typ: SpecialTowerType,
+    pub ingredients: Vec<Tower>,
 }
 
 pub struct UpdateFulfillableSpecialTowerRecipes;
@@ -951,6 +951,7 @@ impl RefineAndPickSelectedTower {
                                 pickable: true,
                                 refinable: false,
                                 removable: false,
+                                combinable: false,
                             });
                             pick_events.send(PickSelectedTower);
                         }
@@ -965,3 +966,14 @@ impl RefineAndPickSelectedTower {
 
 #[derive(Default, Deref, DerefMut, Resource)]
 pub struct RandomLevel(u32);
+
+#[derive(Default)]
+pub struct CombineSelectedTower;
+
+impl CombineSelectedTower {
+    pub fn run(mut events: EventReader<CombineSelectedTower>) {
+        for _ in events.iter() {
+            println!("UOHARCEUHAORECU");
+        }
+    }
+}

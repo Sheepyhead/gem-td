@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use crate::{
     controls::SelectedTower,
     towers::{
-        Cooldown, LaserAttack, PickSelectedTower, RandomLevel, RefineAndPickSelectedTower,
-        RemoveSelectedTower,
+        CombineSelectedTower, Cooldown, LaserAttack, PickSelectedTower, RandomLevel,
+        RefineAndPickSelectedTower, RemoveSelectedTower,
     },
     Phase,
 };
@@ -21,12 +21,15 @@ impl Plugin for GameGuiPlugin {
                 event_buttons::<RefineAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
                 event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Pick)),
                 event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Build)),
+                event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Spawn)),
                 UpgradeChanceButton::interaction,
                 UpgradeChanceButton::update,
                 SelectedText::on_update,
                 show_pickable_button,
                 show_refine_and_pick_button,
                 show_remove_button,
+                show_combine_button,
             ));
     }
 }
@@ -193,6 +196,19 @@ impl SidebarFullscreen {
                     UpgradeChanceButton,
                 ))
                 .add_child(upgrade_chance_button_text)
+                .id(),
+            commands
+                .spawn((EventButtonBundle {
+                    button: ButtonBundle {
+                        style: Style {
+                            size: Size::all(Val::Px(50.)),
+                            ..default()
+                        },
+                        background_color: Color::ORANGE.into(),
+                        ..default()
+                    },
+                    event: EventButton::<CombineSelectedTower>::new(),
+                },))
                 .id(),
         ];
 
@@ -416,6 +432,28 @@ fn show_remove_button(
                 style.display = Display::None;
                 *visibility = Visibility::Hidden;
             }
+        }
+    }
+}
+
+fn show_combine_button(
+    selected: Option<Res<SelectedTower>>,
+    mut buttons: Query<(&mut Style, &mut Visibility), With<EventButton<CombineSelectedTower>>>,
+) {
+    if let Some(selected) = selected {
+        if selected.is_changed() {
+            for (mut style, mut visibility) in &mut buttons {
+                (style.display, *visibility) = if selected.combinable {
+                    (Display::Flex, Visibility::Inherited)
+                } else {
+                    (Display::None, Visibility::Hidden)
+                }
+            }
+        }
+    } else {
+        for (mut style, mut visibility) in &mut buttons {
+            style.display = Display::None;
+            *visibility = Visibility::Hidden;
         }
     }
 }

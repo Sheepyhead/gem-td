@@ -36,8 +36,8 @@ use gui::GameGuiPlugin;
 use seldom_map_nav::prelude::*;
 use tower_abilities::TowerAbilitiesPlugin;
 use towers::{
-    rebuild_navmesh, uncover_dirt, BuildGrid, FulfillableSpecialTowerRecipes, LaserAttack,
-    PickSelectedTower, RandomLevel, RefineAndPickSelectedTower, RemoveSelectedTower,
+    rebuild_navmesh, uncover_dirt, BuildGrid, CombineSelectedTower, FulfillableSpecialTowerRecipes,
+    LaserAttack, PickSelectedTower, RandomLevel, RefineAndPickSelectedTower, RemoveSelectedTower,
     SpecialTowerRecipes, UpdateFulfillableSpecialTowerRecipes,
 };
 
@@ -93,6 +93,7 @@ fn main() {
         .add_event::<RemoveSelectedTower>()
         .add_event::<RefineAndPickSelectedTower>()
         .add_event::<UpdateFulfillableSpecialTowerRecipes>()
+        .add_event::<CombineSelectedTower>()
         .init_resource::<Builds>()
         .init_resource::<CurrentLevel>()
         .init_resource::<UnderCursor>()
@@ -139,7 +140,10 @@ fn main() {
             UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Build)),
             UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Pick)),
         ))
-        .add_systems((UpdateFulfillableSpecialTowerRecipes::run,))
+        .add_systems((
+            UpdateFulfillableSpecialTowerRecipes::run,
+            CombineSelectedTower::run,
+        ))
         .run();
 }
 
