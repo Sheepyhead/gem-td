@@ -381,7 +381,7 @@ impl Tower {
                 }),
                 _ => entity,
             },
-            Tower::Dirt => entity,
+            Tower::Dirt => unimplemented!(),
             Tower::Special(_) => entity,
         }
         .id()
@@ -403,7 +403,7 @@ impl Tower {
                 ) => BASE_TOWER_SPEED - 0.2,
                 _ => BASE_TOWER_SPEED,
             },
-            Tower::Dirt => BASE_TOWER_SPEED,
+            Tower::Dirt => unimplemented!(),
             Tower::Special(_) => BASE_TOWER_SPEED,
         }
     }
@@ -435,7 +435,7 @@ impl Tower {
                 GemQuality::Perfect => 1.,
             },
             Tower::Dirt => 0.,
-            Tower::Special(_) => 0.,
+            Tower::Special(_) => 0.5,
         }
     }
 }
@@ -465,7 +465,15 @@ impl Display for Tower {
                 }
             ),
             Tower::Dirt => write!(f, "Dirt"),
-            Tower::Special(_) => write!(f, "Special tower"),
+            Tower::Special(typ) => write!(
+                f,
+                "{}",
+                match typ {
+                    SpecialTowerType::Malachite(1) => "Vivid Malachite",
+                    SpecialTowerType::Malachite(2) => "Mighty Malachite",
+                    SpecialTowerType::Malachite(_) => "Malachite",
+                }
+            ),
         }
     }
 }
@@ -559,7 +567,14 @@ impl From<Tower> for LaserAttack {
                 },
             },
             Tower::Dirt => unimplemented!(),
-            Tower::Special(_) => unimplemented!(),
+            Tower::Special(typ) => match typ {
+                SpecialTowerType::Malachite(_) => Self {
+                    range: 7.5,
+                    color: Color::BLACK,
+                    damage: Damage::Fixed(6),
+                    hits: Hits::All,
+                },
+            },
         }
     }
 }
@@ -597,7 +612,7 @@ impl From<Tower> for Mesh {
                 max_z: 1.,
             }
             .into(),
-            Tower::Special(_) => todo!(),
+            Tower::Special(_) => shape::Cube { size: 1.0 }.into(),
         }
     }
 }
@@ -971,9 +986,111 @@ pub struct RandomLevel(u32);
 pub struct CombineSelectedTower;
 
 impl CombineSelectedTower {
-    pub fn run(mut events: EventReader<CombineSelectedTower>) {
+    pub fn run(
+        mut commands: Commands,
+        mut pick_events: EventWriter<PickSelectedTower>,
+        mut events: EventReader<CombineSelectedTower>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut mats: ResMut<Assets<StandardMaterial>>,
+        phase: Res<State<Phase>>,
+        fulfillable_recipes: Res<FulfillableSpecialTowerRecipes>,
+        selected_tower: Option<Res<SelectedTower>>,
+        towers: Query<(Entity, &Tower)>,
+        transforms: Query<&GlobalTransform>,
+    ) {
         for _ in events.iter() {
-            println!("UOHARCEUHAORECU");
+            if let Some(SelectedTower {
+                tower: selected_tower,
+                combinable,
+                ..
+            }) = selected_tower.as_deref()
+            {
+                if !combinable {
+                    continue;
+                }
+                let target_type = towers.get_component::<Tower>(*selected_tower).unwrap();
+                let recipe = fulfillable_recipes
+                    .iter()
+                    .find(|recipe| recipe.ingredients.contains(target_type))
+                    .unwrap();
+                let mut needed_ingredients = recipe
+                    .ingredients
+                    .iter()
+                    .filter(|tower| tower != &target_type)
+                    .collect::<Vec<_>>();
+                dbg!(&needed_ingredients);
+                let mut ingredients = towers
+                    .iter()
+                    .filter(|(_, tower)| {
+                        let is_ingredient = needed_ingredients.contains(tower);
+                        if is_ingredient {
+                            needed_ingredients = needed_ingredients
+                                .iter()
+                                .filter_map(|typ| if typ == tower { None } else { Some(*typ) })
+                                .collect();
+                        }
+                        is_ingredient
+                    })
+                    .collect::<Vec<_>>();
+                ingredients.push((*selected_tower, target_type));
+                if dbg!(needed_ingredients).is_empty()
+                    && ingredients.len() == recipe.ingredients.len()
+                {
+                    for (entity, _) in dbg!(ingredients) {
+                        let transform = transforms.get(entity).unwrap();
+                        commands.entity(entity).despawn_recursive();
+                        if &entity != selected_tower {
+                            commands.spawn((
+                                PbrBundle {
+                                    mesh: meshes.add(Tower::Dirt.into()),
+                                    material: mats.add(Color::ORANGE_RED.into()),
+                                    transform: Transform::from_xyz(
+                                        transform.compute_transform().translation.x,
+                                        Tower::Dirt.get_y_offset(),
+                                        transform.compute_transform().translation.z,
+                                    ),
+                                    ..default()
+                                },
+                                Name::new("Dirt"),
+                                Tower::Dirt,
+                            ));
+                        }
+                    }
+                    let position = transforms.get(*selected_tower).unwrap();
+                    let new_tower = Tower::Special(recipe.typ);
+                    let cooldown: Cooldown = new_tower.into();
+                    let new_tower = new_tower.add_abilities(&mut commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(new_tower.into()),
+                            material: mats.add(Color::BLACK.into()),
+                            transform: Transform::from_xyz(
+                                position.compute_transform().translation.x,
+                                new_tower.get_y_offset(),
+                                position.compute_transform().translation.z,
+                            ),
+                            ..default()
+                        },
+                        Name::new(new_tower.to_string()),
+                        new_tower,
+                        LaserAttack::from(new_tower),
+                        cooldown,
+                        Target::Single(None),
+                        SpeedModifiers::default(),
+                        JustBuilt,
+                    )));
+                    let in_picking_phase = phase.0 == Phase::Pick;
+                    commands.insert_resource(SelectedTower {
+                        tower: new_tower,
+                        pickable: in_picking_phase,
+                        refinable: false,
+                        removable: false,
+                        combinable: false,
+                    });
+                    if in_picking_phase {
+                        pick_events.send(PickSelectedTower);
+                    }
+                }
+            }
         }
     }
 }
