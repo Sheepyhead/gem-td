@@ -14,15 +14,12 @@
     clippy::must_use_candidate,
     clippy::enum_glob_use
 )]
-#![feature(is_some_and)]
 
 use bevy::{
     prelude::{shape::Plane, *},
     window::WindowResolution,
 };
-use bevy_debug_grid::DebugGridPlugin;
 use bevy_inspector_egui::quick::{ResourceInspectorPlugin, WorldInspectorPlugin};
-use bevy_prototype_debug_lines::DebugLinesPlugin;
 use bevy_rapier3d::prelude::*;
 use common::{
     update_creep_position, Builds, CreepPos, Fadeout, MovingTo, TrackWorldObjectToScreenPosition,
@@ -80,11 +77,11 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugin(DebugLinesPlugin::with_depth_test(true))
-        .add_plugin(MapNavPlugin::<CreepPos>::default())
-        .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(DebugGridPlugin::with_floor_grid())
+        .add_plugins((
+            MapNavPlugin::<CreepPos>::default(),
+            WorldInspectorPlugin::new(),
+            RapierPhysicsPlugin::<NoUserData>::default(),
+        ))
         // Internal plugins
         .add_state::<Phase>()
         .add_event::<Hit>()
@@ -103,47 +100,58 @@ fn main() {
         .init_resource::<SpecialTowerRecipes>()
         .init_resource::<FulfillableSpecialTowerRecipes>()
         .register_type::<FulfillableSpecialTowerRecipes>()
-        .add_plugin(ResourceInspectorPlugin::<FulfillableSpecialTowerRecipes>::default())
-        .add_plugin(TowerAbilitiesPlugin)
-        .add_plugin(GameGuiPlugin)
-        .add_startup_system(startup)
-        .add_systems((
-            update_under_cursor,
-            LaserAttack::attack,
-            Fadeout::fadeout,
-            Hit::consume,
-            TrackWorldObjectToScreenPosition::track,
-            MovingTo::move_to,
-            Dead::death,
-            CreepSpawner::spawn.in_set(OnUpdate(Phase::Spawn)),
-            HitPoints::spawn_health_bars,
-            HitPoints::update_health_bars,
-            Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
-            show_highlight.in_set(OnUpdate(Phase::Build)),
-            build_on_click.in_set(OnUpdate(Phase::Build)),
-            update_creep_position,
+        .add_plugins((
+            ResourceInspectorPlugin::<FulfillableSpecialTowerRecipes>::default(),
+            TowerAbilitiesPlugin,
+            GameGuiPlugin,
         ))
-        .add_systems((
-            CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
-            check_state_change,
-            rebuild_navmesh.in_schedule(OnExit(Phase::Pick)),
-            uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
-            remove_highlight.in_schedule(OnExit(Phase::Build)),
-            PickSelectedTower::pick_building.in_set(OnUpdate(Phase::Pick)),
-            next_level.in_schedule(OnExit(Phase::Spawn)),
-            Slow::change.in_set(OnUpdate(Phase::Spawn)),
-            LaserAttack::update_multiple_targets,
-            SelectedTower::selection,
-            RemoveSelectedTower::remove,
-            RefineAndPickSelectedTower::refine_and_pick,
-            cursor_over_gui,
-            UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Build)),
-            UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Pick)),
-        ))
-        .add_systems((
-            UpdateFulfillableSpecialTowerRecipes::run,
-            CombineSelectedTower::run,
-        ))
+        .add_systems(Startup, (startup,))
+        .add_systems(
+            Update,
+            (
+                update_under_cursor,
+                LaserAttack::attack,
+                Fadeout::fadeout,
+                Hit::consume,
+                TrackWorldObjectToScreenPosition::track,
+                MovingTo::move_to,
+                Dead::death,
+                // CreepSpawner::spawn.in_set(OnUpdate(Phase::Spawn)),
+                HitPoints::spawn_health_bars,
+                HitPoints::update_health_bars,
+                // Builds::reset_system.in_schedule(OnEnter(Phase::Build)),
+                // show_highlight.in_set(OnUpdate(Phase::Build)),
+                // build_on_click.in_set(OnUpdate(Phase::Build)),
+                update_creep_position,
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                // CreepSpawner::reset_amount_system.in_schedule(OnEnter(Phase::Spawn)),
+                check_state_change,
+                // rebuild_navmesh.in_schedule(OnExit(Phase::Pick)),
+                // uncover_dirt.in_schedule(OnEnter(Phase::Pick)),
+                // remove_highlight.in_schedule(OnExit(Phase::Build)),
+                // PickSelectedTower::pick_building.in_set(OnUpdate(Phase::Pick)),
+                // next_level.in_schedule(OnExit(Phase::Spawn)),
+                // Slow::change.in_set(OnUpdate(Phase::Spawn)),
+                LaserAttack::update_multiple_targets,
+                SelectedTower::selection,
+                RemoveSelectedTower::remove,
+                RefineAndPickSelectedTower::refine_and_pick,
+                cursor_over_gui,
+                // UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Build)),
+                // UpdateFulfillableSpecialTowerRecipes::fire.in_schedule(OnExit(Phase::Pick)),
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                UpdateFulfillableSpecialTowerRecipes::run,
+                CombineSelectedTower::run,
+            ),
+        )
         .run();
 }
 

@@ -15,20 +15,23 @@ pub struct TowerAbilitiesPlugin;
 
 impl Plugin for TowerAbilitiesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems((
-            SlowPoisonOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
-            SlowPoison::add.in_set(OnUpdate(Phase::Spawn)),
-            SlowPoison::update.in_set(OnUpdate(Phase::Spawn)),
-            SapphireSlowOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
-            SapphireSlow::changed.in_set(OnUpdate(Phase::Spawn)),
-            SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
-            CritOnHit::crit.in_set(OnUpdate(Phase::Spawn)),
-            SplashOnHit::splash.in_set(OnUpdate(Phase::Spawn)),
-            Aura::aura_tower_added,
-            Aura::aura_tower_removed,
-            Aura::tower_added,
-            SpeedModifiers::update,
-        ));
+        app.add_systems(
+            Update,
+            (
+                // SlowPoisonOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
+                // SlowPoison::add.in_set(OnUpdate(Phase::Spawn)),
+                // SlowPoison::update.in_set(OnUpdate(Phase::Spawn)),
+                // SapphireSlowOnHit::on_hit.in_set(OnUpdate(Phase::Spawn)),
+                // SapphireSlow::changed.in_set(OnUpdate(Phase::Spawn)),
+                // SapphireSlow::update.in_set(OnUpdate(Phase::Spawn)),
+                // CritOnHit::crit.in_set(OnUpdate(Phase::Spawn)),
+                // SplashOnHit::splash.in_set(OnUpdate(Phase::Spawn)),
+                Aura::aura_tower_added,
+                Aura::aura_tower_removed,
+                Aura::tower_added,
+                SpeedModifiers::update,
+            ),
+        );
     }
 }
 

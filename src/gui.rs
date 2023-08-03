@@ -15,22 +15,26 @@ pub struct GameGuiPlugin;
 
 impl Plugin for GameGuiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_systems((SidebarFullscreen::spawn,))
-            .add_systems((
-                event_buttons::<PickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-                event_buttons::<RefineAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-                event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-                event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Build)),
-                event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Pick)),
-                event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Spawn)),
-                UpgradeChanceButton::interaction,
-                UpgradeChanceButton::update,
-                SelectedText::on_update,
-                show_pickable_button,
-                show_refine_and_pick_button,
-                show_remove_button,
-                show_combine_button,
-            ));
+        app.add_systems(Startup, (SidebarFullscreen::spawn,))
+            .add_systems(
+                Update,
+                (
+                    // TODO: unfuck
+                    // event_buttons::<PickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                    // event_buttons::<RefineAndPickSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                    // event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                    // event_buttons::<RemoveSelectedTower>.in_set(OnUpdate(Phase::Build)),
+                    // event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Pick)),
+                    // event_buttons::<CombineSelectedTower>.in_set(OnUpdate(Phase::Spawn)),
+                    UpgradeChanceButton::interaction,
+                    UpgradeChanceButton::update,
+                    SelectedText::on_update,
+                    show_pickable_button,
+                    show_refine_and_pick_button,
+                    show_remove_button,
+                    show_combine_button,
+                ),
+            );
     }
 }
 
@@ -48,7 +52,8 @@ impl SidebarFullscreen {
                     style: Style {
                         position_type: PositionType::Absolute,
                         flex_direction: FlexDirection::ColumnReverse,
-                        size: Size::all(Val::Percent(100.)),
+                        width: Val::Percent(100.),
+                        height: Val::Percent(100.),
                         ..default()
                     },
                     ..default()
@@ -71,7 +76,8 @@ impl SidebarFullscreen {
                             left: Val::Percent(5.),
                             right: Val::Percent(5.),
                         },
-                        size: Size::height(Val::Percent(100.)),
+                        width: Val::Percent(100.),
+                        height: Val::Percent(100.),
                         align_self: AlignSelf::End,
                         ..default()
                     },
@@ -146,7 +152,8 @@ impl SidebarFullscreen {
                 .spawn((EventButtonBundle {
                     button: ButtonBundle {
                         style: Style {
-                            size: Size::all(Val::Px(50.)),
+                            width: Val::Percent(50.),
+                            height: Val::Percent(50.),
                             ..default()
                         },
                         background_color: Color::PINK.into(),
@@ -159,7 +166,8 @@ impl SidebarFullscreen {
                 .spawn((EventButtonBundle {
                     button: ButtonBundle {
                         style: Style {
-                            size: Size::all(Val::Px(50.)),
+                            width: Val::Percent(50.),
+                            height: Val::Percent(50.),
                             ..default()
                         },
                         background_color: Color::GREEN.into(),
@@ -172,7 +180,8 @@ impl SidebarFullscreen {
                 .spawn((EventButtonBundle {
                     button: ButtonBundle {
                         style: Style {
-                            size: Size::all(Val::Px(50.)),
+                            width: Val::Percent(50.),
+                            height: Val::Percent(50.),
                             ..default()
                         },
                         background_color: Color::TEAL.into(),
@@ -185,7 +194,8 @@ impl SidebarFullscreen {
                 .spawn((
                     ButtonBundle {
                         style: Style {
-                            size: Size::all(Val::Px(50.)),
+                            width: Val::Percent(50.),
+                            height: Val::Percent(50.),
                             align_content: AlignContent::Center,
                             justify_content: JustifyContent::Center,
                             ..default()
@@ -201,7 +211,8 @@ impl SidebarFullscreen {
                 .spawn((EventButtonBundle {
                     button: ButtonBundle {
                         style: Style {
-                            size: Size::all(Val::Px(50.)),
+                            width: Val::Percent(50.),
+                            height: Val::Percent(50.),
                             ..default()
                         },
                         background_color: Color::ORANGE.into(),
@@ -242,7 +253,7 @@ impl UpgradeChanceButton {
         buttons: Query<&Interaction, (With<UpgradeChanceButton>, Changed<Interaction>)>,
     ) {
         for interaction in &buttons {
-            if let Interaction::Clicked = interaction {
+            if let Interaction::Pressed = interaction {
                 **random_level += 1;
             }
         }
@@ -331,7 +342,6 @@ impl SelectedText {
 
 #[derive(Bundle)]
 struct EventButtonBundle<T: Default + Send + Sync + 'static> {
-    #[bundle]
     button: ButtonBundle,
     event: EventButton<T>,
 }
@@ -345,12 +355,12 @@ impl<T: Default> EventButton<T> {
     }
 }
 
-fn event_buttons<T: Default + Send + Sync + 'static>(
+fn event_buttons<T: Default + Event + Send + Sync + 'static>(
     mut events: EventWriter<T>,
     buttons: Query<&Interaction, (Changed<Interaction>, With<EventButton<T>>)>,
 ) {
     for interaction in &buttons {
-        if let Interaction::Clicked = interaction {
+        if let Interaction::Pressed = interaction {
             events.send(T::default());
         }
     }
@@ -408,7 +418,7 @@ fn show_remove_button(
     phase: Res<State<Phase>>,
     mut buttons: Query<(&mut Style, &mut Visibility), With<EventButton<RemoveSelectedTower>>>,
 ) {
-    match phase.0 {
+    match phase.get() {
         Phase::Build | Phase::Pick => {
             if let Some(selected) = selected {
                 if selected.is_changed() {

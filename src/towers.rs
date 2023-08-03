@@ -5,7 +5,6 @@ use std::{
 };
 
 use bevy::{ecs::system::EntityCommands, math::Vec3Swizzles, prelude::*, utils::HashSet};
-use bevy_prototype_debug_lines::DebugLines;
 use seldom_map_nav::prelude::*;
 
 use crate::{
@@ -103,7 +102,7 @@ pub fn rebuild_navmesh(
     );
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum GemType {
     Emerald,
     Ruby,
@@ -115,7 +114,7 @@ pub enum GemType {
     Topaz,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum GemQuality {
     Chipped,
     Flawed,
@@ -221,17 +220,18 @@ impl GemType {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum SpecialTowerType {
     Malachite(u32),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Clone, Debug, PartialEq, Eq, Reflect)]
 pub struct SpecialTowerRecipe {
     pub typ: SpecialTowerType,
     pub ingredients: Vec<Tower>,
 }
 
+#[derive(Event)]
 pub struct UpdateFulfillableSpecialTowerRecipes;
 
 impl UpdateFulfillableSpecialTowerRecipes {
@@ -248,7 +248,7 @@ impl UpdateFulfillableSpecialTowerRecipes {
         just_built_towers: Query<&Tower, With<JustBuilt>>,
     ) {
         for _ in events.iter() {
-            **fulfillable = dbg!(recipes.get_fulfilled_recipes(match phase.0 {
+            **fulfillable = dbg!(recipes.get_fulfilled_recipes(match phase.get() {
                 Phase::Pick => just_built_towers.iter().collect(),
                 Phase::Spawn => towers.iter().collect(),
                 Phase::Build => unimplemented!(),
@@ -257,7 +257,7 @@ impl UpdateFulfillableSpecialTowerRecipes {
     }
 }
 
-#[derive(Default, Resource, Deref, DerefMut, Reflect, FromReflect)]
+#[derive(Default, Resource, Deref, DerefMut, Reflect)]
 pub struct FulfillableSpecialTowerRecipes(Vec<SpecialTowerRecipe>);
 
 #[derive(Resource, Deref, DerefMut)]
@@ -304,7 +304,7 @@ impl SpecialTowerRecipes {
     }
 }
 
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum Tower {
     Gem { typ: GemType, quality: GemQuality },
     Special(SpecialTowerType),
@@ -648,7 +648,8 @@ pub struct LaserAttack {
 
 impl LaserAttack {
     pub fn attack(
-        mut lines: ResMut<DebugLines>,
+        // TODO: unfuck
+        // mut lines: ResMut<DebugLines>,
         time: Res<Time>,
         mut writer: EventWriter<Hit>,
         mut towers: Query<
@@ -697,12 +698,12 @@ impl LaserAttack {
                         } else {
                             // Target is alive and in range
                             cooldown.reset();
-                            lines.line_colored(
-                                tower_pos.translation(),
-                                target_pos.translation,
-                                0.25,
-                                attack.color,
-                            );
+                            // lines.line_colored(
+                            //     tower_pos.translation(),
+                            //     target_pos.translation,
+                            //     0.25,
+                            //     attack.color,
+                            // );
 
                             writer.send(Hit {
                                 source: tower,
@@ -829,7 +830,7 @@ impl Display for Damage {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct PickSelectedTower;
 
 impl PickSelectedTower {
@@ -878,7 +879,7 @@ impl PickSelectedTower {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct RemoveSelectedTower;
 
 impl RemoveSelectedTower {
@@ -915,7 +916,7 @@ impl RemoveSelectedTower {
 #[derive(Component)]
 pub struct JustBuilt;
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct RefineAndPickSelectedTower;
 
 impl RefineAndPickSelectedTower {
@@ -982,7 +983,7 @@ impl RefineAndPickSelectedTower {
 #[derive(Default, Deref, DerefMut, Resource)]
 pub struct RandomLevel(u32);
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct CombineSelectedTower;
 
 impl CombineSelectedTower {
@@ -1078,7 +1079,7 @@ impl CombineSelectedTower {
                         SpeedModifiers::default(),
                         JustBuilt,
                     )));
-                    let in_picking_phase = phase.0 == Phase::Pick;
+                    let in_picking_phase = *phase.get() == Phase::Pick;
                     commands.insert_resource(SelectedTower {
                         tower: new_tower,
                         pickable: in_picking_phase,

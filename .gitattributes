@@ -1,0 +1,12 @@
+assets/creep.glb filter=lfs diff=lfs merge=lfs -text
+assets/normal.glb filter=lfs diff=lfs merge=lfs -text
+assets/perfect.glb filter=lfs diff=lfs merge=lfs -text
+assets/special.glb filter=lfs diff=lfs merge=lfs -text
+assets/chipped.glb filter=lfs diff=lfs merge=lfs -text
+assets/dirt.glb filter=lfs diff=lfs merge=lfs -text
+assets/flawed.glb filter=lfs diff=lfs merge=lfs -text
+assets/flawless.glb filter=lfs diff=lfs merge=lfs -text
+assets/slate.glb filter=lfs diff=lfs merge=lfs -text
+assets/dirt.gltf filter=lfs diff=lfs merge=lfs -text
+assets/greyboxes.blend filter=lfs diff=lfs merge=lfs -text
+assets/greyboxes.blend1 filter=lfs diff=lfs merge=lfs -text
