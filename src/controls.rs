@@ -164,7 +164,7 @@ pub fn build_on_click(
     cursor_over_gui: Res<CursorOverGui>,
 ) {
     // If there are no more builds and the current phase is Build, change phase
-    if **builds == 0 && phase.0 == Phase::Build {
+    if **builds == 0 && *phase.get() == Phase::Build {
         next_phase.set(Phase::Pick);
         return;
     }
@@ -177,6 +177,7 @@ pub fn build_on_click(
         if let MouseButtonInput {
             button: MouseButton::Left,
             state: ButtonState::Pressed,
+            ..
         } = event
         {
             if let Some(cursor_pos) = **cursor_pos {
@@ -242,6 +243,7 @@ impl SelectedTower {
             if let MouseButtonInput {
                 button: MouseButton::Left,
                 state: ButtonState::Pressed,
+                ..
             } = event
             {
                 if **cursor_over_gui {

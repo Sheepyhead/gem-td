@@ -18,6 +18,7 @@ pub struct Creep {
     pub typ: CreepType,
 }
 
+#[derive(Event)]
 pub struct Hit {
     pub source: Entity,
     pub target: Entity,
@@ -98,7 +99,7 @@ impl HitPoints {
     ) {
         for (mut style, bar) in &mut health_bars {
             if let Ok(hitpoints) = hitpoints.get(bar.target) {
-                style.size.width = Val::Percent(hitpoints.ratio() * 100.0);
+                style.width = Val::Percent(hitpoints.ratio() * 100.0);
             }
         }
     }
@@ -155,7 +156,7 @@ impl HitPoints {
 #[derive(Component)]
 struct UpdateHitpointsBar(Entity);
 
-#[derive(Deref, DerefMut)]
+#[derive(Deref, DerefMut, Event)]
 pub struct Dead(pub Entity);
 
 impl Dead {

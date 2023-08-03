@@ -18,24 +18,17 @@ impl TrackWorldObjectToScreenPosition {
             &mut tracking_objects
         {
             if let Ok(world_pos) = world_objects.get(*target) {
-                if let Size {
-                    width: Val::Px(width),
-                    height: Val::Px(height),
-                } = style.size
-                {
+                if let (Val::Px(width), Val::Px(height)) = (style.width, style.height) {
                     let (cam_pos, camera) = cameras.single();
                     if let Some(screen_position) =
                         camera.world_to_viewport(cam_pos, world_pos.translation())
                     {
                         let window = windows.single();
-                        let new_pos = UiRect::new(
-                            Val::Px(screen_position.x - width / 2.0 + offset.x),
-                            Val::Auto,
-                            Val::Px(window.height() - screen_position.y - height / 2.0 + offset.y),
-                            Val::Auto,
-                        );
-
-                        style.position = new_pos;
+                        style.left = Val::Px(screen_position.x - width / 2.0 + offset.x);
+                        style.right = Val::Auto;
+                        style.top =
+                            Val::Px(window.height() - screen_position.y - height / 2.0 + offset.y);
+                        style.bottom = Val::Auto;
                     }
                 }
             }

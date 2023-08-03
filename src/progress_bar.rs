@@ -19,13 +19,12 @@ impl ProgressBar {
                 background_color: background_color.into(),
                 style: Style {
                     position_type: PositionType::Absolute,
-                    position: UiRect::new(
-                        Val::Px(position.x - 16.0),
-                        Val::Auto,
-                        Val::Px(position.y - 2.5),
-                        Val::Auto,
-                    ),
-                    size: Size::new(Val::Px(32.0), Val::Px(5.0)),
+                    left: Val::Px(position.x - 16.0),
+                    right: Val::Auto,
+                    top: Val::Px(position.y - 2.5),
+                    bottom: Val::Auto,
+                    width: Val::Px(32.0),
+                    height: Val::Px(5.0),
                     ..default()
                 },
                 ..default()
@@ -35,7 +34,8 @@ impl ProgressBar {
                     NodeBundle {
                         background_color: foreground_color.into(),
                         style: Style {
-                            size: Size::new(Val::Percent(progress * 100.0), Val::Percent(100.0)),
+                            width: Val::Percent(progress * 100.0),
+                            height: Val::Percent(100.0),
                             ..default()
                         },
                         ..default()
